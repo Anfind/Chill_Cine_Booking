@@ -1,46 +1,138 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Loader2 } from "lucide-react"
 import { TimelineBooking } from "@/components/timeline-booking"
 import { BookingForm } from "@/components/booking-form"
 import { RoomDetailsPanel } from "@/components/room-details-panel"
-import { rooms, getRoomsByBranch, getBookingsByRoom, branches } from "@/lib/data"
+import { fetchRoomById, fetchRooms, fetchBookings } from "@/lib/api-client"
+import { format } from "date-fns"
 
-export default function BookingPage({ params }: { params: { roomId: string } }) {
-  const { roomId } = params
+interface Room {
+  _id: string
+  name: string
+  code: string
+  capacity: number
+  pricePerHour: number
+  images: string[]
+  amenities: string[]
+  description: string
+  branchId: any
+  roomTypeId: any
+}
+
+interface Booking {
+  _id: string
+  roomId: string
+  startTime: Date
+  endTime: Date
+  status: string
+  customerInfo: any
+}
+
+export default function BookingPage({ params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = use(params)
   const router = useRouter()
   const [showBookingForm, setShowBookingForm] = useState(false)
   const [selectedBooking, setSelectedBooking] = useState<{
     startTime: Date
     endTime: Date
   } | null>(null)
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  
+  // Data states
+  const [room, setRoom] = useState<Room | null>(null)
+  const [branchRooms, setBranchRooms] = useState<Room[]>([])
+  const [allBookings, setAllBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const room = rooms.find((r) => r.id === roomId)
-  const branch = room ? branches.find((b) => b.id === room.branchId) : null
-  const branchRooms = room ? getRoomsByBranch(room.branchId) : []
-  const allBookings = branchRooms.flatMap((r) => getBookingsByRoom(r.id))
+  // Load data on mount and when date changes
+  useEffect(() => {
+    loadData()
+  }, [roomId, selectedDate])
 
-  if (!room || !branch) {
+  const loadData = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // 1. Load room details
+      const roomResponse = await fetchRoomById(roomId)
+      if (!roomResponse.success || !roomResponse.data) {
+        setError('Không tìm thấy phòng')
+        setLoading(false)
+        return
+      }
+      const roomData = roomResponse.data
+      setRoom(roomData)
+
+      // 2. Load all rooms in the same branch
+      const roomsResponse = await fetchRooms(roomData.branchId._id, 'available')
+      if (roomsResponse.success && roomsResponse.data) {
+        setBranchRooms(roomsResponse.data)
+      }
+
+      // 3. Load bookings for the selected date
+      const dateString = format(selectedDate, 'yyyy-MM-dd')
+      const bookingsResponse = await fetchBookings({
+        branchId: roomData.branchId._id,
+        date: dateString,
+      })
+      if (bookingsResponse.success && bookingsResponse.data) {
+        setAllBookings(bookingsResponse.data)
+      }
+    } catch (err) {
+      setError('Có lỗi xảy ra khi tải dữ liệu')
+      console.error('Error loading booking page data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Không tìm thấy phòng</h1>
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Đang tải thông tin phòng...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !room) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">{error || 'Không tìm thấy phòng'}</h1>
           <Button onClick={() => router.back()}>Quay lại</Button>
         </div>
       </div>
     )
   }
 
+  const branch = room.branchId // Already populated from API
+
   const handleBookingSelect = (roomId: string, startTime: Date, endTime: Date) => {
     setSelectedBooking({ startTime, endTime })
     setShowBookingForm(true)
   }
 
-  const handleBookingSubmit = (data: any) => {
-    router.push(`/payment?room=${roomId}&name=${encodeURIComponent(data.customerName)}&phone=${data.customerPhone}`)
+  const handleBookingSubmit = async (bookingData: any) => {
+    // This will be handled in BookingForm component
+    // After successful booking creation, redirect to payment
+    if (bookingData.bookingId) {
+      router.push(`/payment?bookingId=${bookingData.bookingId}`)
+    }
+  }
+
+  const handleDateChange = (newDate: Date) => {
+    setSelectedDate(newDate)
+    setShowBookingForm(false)
+    setSelectedBooking(null)
   }
 
   return (
@@ -67,7 +159,13 @@ export default function BookingPage({ params }: { params: { roomId: string } }) 
                 <h2 className="text-xl font-semibold text-gray-800">Chọn khung giờ</h2>
                 <p className="text-sm text-gray-600">Nhấn vào ô trống để chọn giờ đặt phòng</p>
               </div>
-              <TimelineBooking rooms={branchRooms} bookings={allBookings} onBookingSelect={handleBookingSelect} />
+              <TimelineBooking 
+                rooms={branchRooms} 
+                bookings={allBookings} 
+                selectedDate={selectedDate}
+                onDateChange={handleDateChange}
+                onBookingSelect={handleBookingSelect} 
+              />
             </div>
             <div className="lg:col-span-1">
               <RoomDetailsPanel room={room} />
@@ -78,7 +176,7 @@ export default function BookingPage({ params }: { params: { roomId: string } }) 
             <div className="lg:col-span-2">
               <BookingForm
                 room={room}
-                selectedDate={new Date()}
+                selectedDate={selectedDate}
                 selectedStartTime={selectedBooking?.startTime}
                 selectedEndTime={selectedBooking?.endTime}
                 onSubmit={handleBookingSubmit}

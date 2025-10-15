@@ -1,0 +1,196 @@
+import { NextResponse } from 'next/server'
+import connectDB from '@/lib/mongodb'
+import { Booking, Room, Branch, ComboPackage } from '@/lib/models'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * GET /api/bookings?roomId=xxx&date=2025-10-15
+ * Lấy danh sách bookings theo roomId và date
+ */
+export async function GET(request: Request) {
+  try {
+    await connectDB()
+
+    const { searchParams } = new URL(request.url)
+    const roomId = searchParams.get('roomId')
+    const date = searchParams.get('date')
+    const branchId = searchParams.get('branchId')
+
+    let query: any = {}
+
+    if (roomId) {
+      query.roomId = roomId
+    }
+
+    if (branchId) {
+      query.branchId = branchId
+    }
+
+    if (date) {
+      const startOfDay = new Date(date)
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(date)
+      endOfDay.setHours(23, 59, 59, 999)
+
+      query.bookingDate = {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      }
+    }
+
+    const bookings = await Booking.find(query)
+      .populate('roomId', 'name code capacity')
+      .populate('branchId', 'name address')
+      .sort({ startTime: 1 })
+      .lean()
+
+    return NextResponse.json({
+      success: true,
+      data: bookings,
+      count: bookings.length,
+      filters: { roomId, date, branchId },
+    })
+  } catch (error) {
+    console.error('Error fetching bookings:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to fetch bookings',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * POST /api/bookings
+ * Tạo booking mới
+ */
+export async function POST(request: Request) {
+  try {
+    await connectDB()
+
+    const body = await request.json()
+
+    // Validate required fields
+    const requiredFields = ['roomId', 'customerInfo', 'startTime', 'endTime']
+    for (const field of requiredFields) {
+      if (!body[field]) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Missing required field: ${field}`,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Get room info
+    const room = await Room.findById(body.roomId)
+    if (!room) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Room not found',
+        },
+        { status: 404 }
+      )
+    }
+
+    // Check for booking conflicts
+    const startTime = new Date(body.startTime)
+    const endTime = new Date(body.endTime)
+
+    const conflictingBooking = await Booking.findOne({
+      roomId: body.roomId,
+      status: { $in: ['pending', 'confirmed', 'checked-in'] },
+      $or: [
+        { startTime: { $lt: endTime }, endTime: { $gt: startTime } },
+        { startTime: { $gte: startTime, $lt: endTime } },
+        { endTime: { $gt: startTime, $lte: endTime } },
+      ],
+    })
+
+    if (conflictingBooking) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Room is already booked for this time slot',
+          conflictingBooking: {
+            startTime: conflictingBooking.startTime,
+            endTime: conflictingBooking.endTime,
+          },
+        },
+        { status: 409 }
+      )
+    }
+
+    // Generate unique booking code
+    const bookingCode = `BK${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+
+    // Calculate duration in hours
+    const duration = Math.ceil((endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60))
+
+    // Calculate pricing
+    const roomTotal = body.comboPackageId ? body.comboPrice || 0 : room.pricePerHour * duration
+    const menuTotal = body.menuItems?.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0
+    const subtotal = roomTotal + menuTotal
+    const tax = 0 // Can add VAT calculation here
+    const discount = body.discount || 0
+    const total = subtotal + tax - discount
+
+    // Create booking
+    const booking = await Booking.create({
+      bookingCode,
+      roomId: body.roomId,
+      branchId: room.branchId,
+      customerInfo: body.customerInfo,
+      bookingDate: startTime,
+      startTime,
+      endTime,
+      duration,
+      comboPackageId: body.comboPackageId,
+      roomPrice: room.pricePerHour,
+      menuItems: body.menuItems || [],
+      pricing: {
+        roomTotal,
+        menuTotal,
+        subtotal,
+        tax,
+        discount,
+        total,
+      },
+      status: 'pending',
+      paymentStatus: 'unpaid',
+      notes: body.notes,
+    })
+
+    const populatedBooking = await Booking.findById(booking._id)
+      .populate('roomId', 'name code capacity')
+      .populate('branchId', 'name address phone')
+      .populate('comboPackageId', 'name price duration')
+      .lean()
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: populatedBooking,
+        message: 'Booking created successfully',
+      },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error('Error creating booking:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to create booking',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+}
