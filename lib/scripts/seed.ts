@@ -6,6 +6,7 @@ import RoomType from '../models/RoomType'
 import Room from '../models/Room'
 import ComboPackage from '../models/ComboPackage'
 import MenuItem from '../models/MenuItem'
+import Booking from '../models/Booking'
 
 async function seedDatabase() {
   try {
@@ -20,6 +21,7 @@ async function seedDatabase() {
     await Room.deleteMany({})
     await ComboPackage.deleteMany({})
     await MenuItem.deleteMany({})
+    await Booking.deleteMany({})
 
     console.log('✅ Cleared existing data')
 
@@ -299,6 +301,142 @@ async function seedDatabase() {
     ])
     console.log(`✅ Created ${menuItems.length} menu items`)
 
+    // 7. Seed Sample Bookings
+    // Tạo bookings mẫu cho ngày hôm nay và mai
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const bookingsData = []
+
+    // Lấy vài rooms để tạo bookings
+    const sampleRooms = rooms.slice(0, 10) // Lấy 10 phòng đầu tiên
+    const sampleCombo = combos.find(c => c.code === 'combo-4h')
+    const drinkItem = menuItems.find(m => m.category === 'drink')
+    const snackItem = menuItems.find(m => m.category === 'snack')
+
+    // Tạo booking cho hôm nay
+    for (let i = 0; i < 5; i++) {
+      const room = sampleRooms[i]
+      const startTime = new Date(today)
+      startTime.setHours(14 + i * 2, 0, 0, 0) // 14:00, 16:00, 18:00, 20:00, 22:00
+      
+      const endTime = new Date(startTime)
+      endTime.setHours(startTime.getHours() + 4) // +4 giờ
+
+      const duration = 4
+      const roomTotal = sampleCombo!.price
+      const menuTotal = (drinkItem!.price * 2) + (snackItem!.price * 1)
+      const subtotal = roomTotal + menuTotal
+      const tax = Math.round(subtotal * 0.1)
+      const total = subtotal + tax
+
+      bookingsData.push({
+        bookingCode: `BK${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}${String(i + 1).padStart(3, '0')}`,
+        roomId: room._id,
+        branchId: room.branchId,
+        customerInfo: {
+          name: `Khách hàng ${i + 1}`,
+          phone: `098976000${i}`,
+          email: `customer${i + 1}@example.com`,
+        },
+        bookingDate: today,
+        startTime,
+        endTime,
+        duration,
+        comboPackageId: sampleCombo!._id,
+        roomPrice: roomTotal,
+        menuItems: [
+          {
+            menuItemId: drinkItem!._id,
+            name: drinkItem!.name,
+            price: drinkItem!.price,
+            quantity: 2,
+            subtotal: drinkItem!.price * 2,
+          },
+          {
+            menuItemId: snackItem!._id,
+            name: snackItem!.name,
+            price: snackItem!.price,
+            quantity: 1,
+            subtotal: snackItem!.price * 1,
+          },
+        ],
+        pricing: {
+          roomTotal,
+          menuTotal,
+          subtotal,
+          tax,
+          discount: 0,
+          total,
+        },
+        status: i < 2 ? 'confirmed' : i < 4 ? 'checked-in' : 'pending',
+        paymentStatus: i < 2 ? 'paid' : 'unpaid',
+        paymentMethod: i < 2 ? 'ewallet' : undefined,
+        notes: `Booking mẫu cho ngày hôm nay - phòng ${room.name}`,
+      })
+    }
+
+    // Tạo booking cho ngày mai
+    for (let i = 0; i < 8; i++) {
+      const room = sampleRooms[i + 2] // Sử dụng các phòng khác
+      const startTime = new Date(tomorrow)
+      startTime.setHours(10 + i * 2, 0, 0, 0) // 10:00, 12:00, 14:00, ...
+      
+      const endTime = new Date(startTime)
+      endTime.setHours(startTime.getHours() + 4)
+
+      const duration = 4
+      const roomTotal = sampleCombo!.price
+      const menuTotal = (drinkItem!.price * 2)
+      const subtotal = roomTotal + menuTotal
+      const tax = Math.round(subtotal * 0.1)
+      const total = subtotal + tax
+
+      bookingsData.push({
+        bookingCode: `BK${tomorrow.getFullYear()}${String(tomorrow.getMonth() + 1).padStart(2, '0')}${String(tomorrow.getDate()).padStart(2, '0')}${String(i + 1).padStart(3, '0')}`,
+        roomId: room._id,
+        branchId: room.branchId,
+        customerInfo: {
+          name: `Khách hàng ${i + 6}`,
+          phone: `098976010${i}`,
+          email: `customer${i + 6}@example.com`,
+        },
+        bookingDate: tomorrow,
+        startTime,
+        endTime,
+        duration,
+        comboPackageId: sampleCombo!._id,
+        roomPrice: roomTotal,
+        menuItems: [
+          {
+            menuItemId: drinkItem!._id,
+            name: drinkItem!.name,
+            price: drinkItem!.price,
+            quantity: 2,
+            subtotal: drinkItem!.price * 2,
+          },
+        ],
+        pricing: {
+          roomTotal,
+          menuTotal,
+          subtotal,
+          tax,
+          discount: 0,
+          total,
+        },
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        paymentMethod: 'ewallet',
+        notes: `Booking mẫu cho ngày mai - phòng ${room.name}`,
+      })
+    }
+
+    const bookings = await Booking.insertMany(bookingsData)
+    console.log(`✅ Created ${bookings.length} sample bookings`)
+
     console.log('\n🎉 Database seeded successfully!')
     console.log('📊 Summary:')
     console.log(`   - Cities: ${cities.length}`)
@@ -307,6 +445,10 @@ async function seedDatabase() {
     console.log(`   - Rooms: ${rooms.length}`)
     console.log(`   - Combo Packages: ${combos.length}`)
     console.log(`   - Menu Items: ${menuItems.length}`)
+    console.log(`   - Sample Bookings: ${bookings.length}`)
+    console.log(`\n📅 Booking dates:`)
+    console.log(`   - Today (${today.toLocaleDateString('vi-VN')}): 5 bookings`)
+    console.log(`   - Tomorrow (${tomorrow.toLocaleDateString('vi-VN')}): 8 bookings`)
 
     process.exit(0)
   } catch (error) {

@@ -1,6 +1,7 @@
 ## Admin Dashboard
 
 The admin panel lets you manage branches and rooms with real MongoDB persistence (no mock data).
+URL:      http://localhost:3000/auth/login
 
 ### URL
 - Development: http://localhost:3000/admin (or your current dev port)
@@ -271,6 +272,7 @@ pnpm lint         # Run ESLint
 
 # Database
 pnpm db:seed      # Seed database with sample data
+pnpm db:seed-admin
 ```
 
 ---

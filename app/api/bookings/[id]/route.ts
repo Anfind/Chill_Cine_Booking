@@ -52,6 +52,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 /**
  * PATCH /api/bookings/[id]
+ * PUT /api/bookings/[id]
  * Cập nhật booking (status, payment, check-in/out)
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -109,6 +110,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     )
   }
 }
+
+// Alias PUT to PATCH for compatibility
+export const PUT = PATCH
 
 /**
  * DELETE /api/bookings/[id]

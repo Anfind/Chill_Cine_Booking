@@ -11,8 +11,9 @@ import Room from './Room'
 import ComboPackage from './ComboPackage'
 import MenuItem from './MenuItem'
 import Booking from './Booking'
+import User from './User'
 
-export { City, Branch, RoomType, Room, ComboPackage, MenuItem, Booking }
+export { City, Branch, RoomType, Room, ComboPackage, MenuItem, Booking, User }
 
 export default {
   City,
@@ -22,4 +23,5 @@ export default {
   ComboPackage,
   MenuItem,
   Booking,
+  User,
 }

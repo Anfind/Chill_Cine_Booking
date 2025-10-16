@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import { BottomNav } from "@/components/bottom-nav"
 import { Toaster } from "@/components/ui/toaster"
+import { AuthProvider } from "@/components/auth-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -22,11 +23,13 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
-        <div className="pb-16">
-          <Suspense fallback={null}>{children}</Suspense>
-        </div>
-        <BottomNav />
-        <Toaster />
+        <AuthProvider>
+          <div className="pb-16">
+            <Suspense fallback={null}>{children}</Suspense>
+          </div>
+          <BottomNav />
+          <Toaster />
+        </AuthProvider>
         <Analytics />
       </body>
     </html>
