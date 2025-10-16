@@ -1,3 +1,70 @@
+## Admin Dashboard
+
+The admin panel lets you manage branches and rooms with real MongoDB persistence (no mock data).
+
+### URL
+- Development: http://localhost:3000/admin (or your current dev port)
+
+### Prerequisites
+- MongoDB running locally (mongodb://localhost:27017)
+- Database used: `chill-cine-hotel`
+- Seed data recommended: at least some Cities and Room Types
+
+### Quick start
+1) Start the dev server
+   - pnpm dev
+2) Open `/admin`
+3) Use the tabs to manage:
+   - Tổng quan: simple mock stats preview (non-blocking)
+   - Chi nhánh: create/update/delete branches (saved to DB)
+   - Phòng: create/update/delete rooms, filter by branch, select room type (saved to DB)
+
+### Features
+- Branches
+  - Create, edit, soft-delete (isActive=false)
+  - City selection from `/api/cities`
+  - Phone optional
+- Rooms
+  - Create, edit, soft-delete (isActive=false)
+  - Filter by branch
+  - Room type selection from `/api/room-types`
+  - Fields: name, description, images, amenities, capacity, price, status
+
+### API Endpoints
+- Branches: `/api/branches`, `/api/branches/[id]`
+- Rooms: `/api/rooms`, `/api/rooms/[id]`
+- Cities: `/api/cities`
+- Room Types: `/api/room-types`
+
+### First-time seeding (optional)
+Use mongosh to insert some Cities and Room Types:
+
+```javascript
+use chill_cine_hotel
+
+db.cities.insertMany([
+  { name: 'TP. HCM', code: 'HCM' },
+  { name: 'Hà Nội', code: 'HN' },
+])
+
+db.roomtypes.insertMany([
+  { name: 'Phòng tiêu chuẩn', slug: 'standard', color: '#6366f1' },
+  { name: 'Phòng gia đình', slug: 'family', color: '#22c55e' },
+])
+```
+
+Note: collection names may differ depending on your Mongoose model config. If the above names don’t match, create a branch and a room from the UI to see the actual collection names, then adjust commands accordingly.
+
+### Troubleshooting
+- Can’t load lists (branches/rooms)?
+  - Ensure MongoDB is running
+  - Check server console for API errors
+  - Verify you have at least 1 City (for branches) and 1 Room Type (for rooms)
+- CORS when testing via ngrok
+  - This repo sets relative API calls and includes CORS middleware already
+- Admin auth
+  - Not enforced yet; see `ADMIN_AUTHENTICATION_GUIDE.md` for adding NextAuth
+
 # 🎬 Chill Cine Hotel - Cinema Booking System
 
 > **Mobile-First** Cinema Room Booking Platform built with Next.js 15, MongoDB, and TypeScript

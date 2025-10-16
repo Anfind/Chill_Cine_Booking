@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,21 +17,75 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Pencil, Trash2, MapPin } from "lucide-react"
-import { branches, cities, type Branch } from "@/lib/data"
+import { toast } from "sonner"
+
+interface City {
+  _id: string
+  name: string
+  code: string
+}
+
+interface Branch {
+  _id: string
+  name: string
+  cityId: { _id: string; name: string; code: string }
+  address: string
+  phone?: string
+  slug: string
+}
 
 export function BranchesManager() {
-  const [branchList, setBranchList] = useState<Branch[]>(branches)
+  const [branchList, setBranchList] = useState<Branch[]>([])
+  const [cities, setCities] = useState<City[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     cityId: "",
     address: "",
+    phone: "",
   })
+
+  // Fetch branches and cities on mount
+  useEffect(() => {
+    fetchBranches()
+    fetchCities()
+  }, [])
+
+  const fetchBranches = async () => {
+    try {
+      const res = await fetch('/api/branches')
+      const data = await res.json()
+      if (data.success) {
+        setBranchList(data.data)
+      } else {
+        toast.error('Không thể tải danh sách chi nhánh')
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error)
+      toast.error('Lỗi kết nối')
+    }
+  }
+
+  const fetchCities = async () => {
+    try {
+      const res = await fetch('/api/cities')
+      const data = await res.json()
+      if (data.success) {
+        setCities(data.data)
+      } else {
+        toast.error('Không thể tải danh sách tỉnh thành')
+      }
+    } catch (error) {
+      console.error('Error fetching cities:', error)
+      toast.error('Lỗi kết nối')
+    }
+  }
 
   const handleAdd = () => {
     setEditingBranch(null)
-    setFormData({ name: "", cityId: "", address: "" })
+    setFormData({ name: "", cityId: "", address: "", phone: "" })
     setIsDialogOpen(true)
   }
 
@@ -39,42 +93,74 @@ export function BranchesManager() {
     setEditingBranch(branch)
     setFormData({
       name: branch.name,
-      cityId: branch.cityId,
+      cityId: typeof branch.cityId === 'object' ? branch.cityId._id : branch.cityId,
       address: branch.address,
+      phone: branch.phone || "",
     })
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (branchId: string) => {
-    if (confirm("Bạn có chắc muốn xóa chi nhánh này?")) {
-      setBranchList(branchList.filter((b) => b.id !== branchId))
+  const handleDelete = async (branchId: string) => {
+    if (!confirm("Bạn có chắc muốn xóa chi nhánh này?")) return
+
+    setIsLoading(true)
+    try {
+      const res = await fetch(`/api/branches/${branchId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success('Xóa chi nhánh thành công')
+        fetchBranches() // Refresh list
+      } else {
+        toast.error(data.error || 'Không thể xóa chi nhánh')
+      }
+    } catch (error) {
+      console.error('Error deleting branch:', error)
+      toast.error('Lỗi kết nối')
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
 
-    if (editingBranch) {
-      // Update existing branch
-      setBranchList(
-        branchList.map((b) =>
-          b.id === editingBranch.id
-            ? { ...b, name: formData.name, cityId: formData.cityId, address: formData.address }
-            : b,
-        ),
-      )
-    } else {
-      // Add new branch
-      const newBranch: Branch = {
-        id: `branch-${Date.now()}`,
-        name: formData.name,
-        cityId: formData.cityId,
-        address: formData.address,
+    try {
+      let res
+      if (editingBranch) {
+        // Update existing branch
+        res = await fetch(`/api/branches/${editingBranch._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        })
+      } else {
+        // Add new branch
+        res = await fetch('/api/branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        })
       }
-      setBranchList([...branchList, newBranch])
-    }
 
-    setIsDialogOpen(false)
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success(editingBranch ? 'Cập nhật chi nhánh thành công' : 'Thêm chi nhánh thành công')
+        setIsDialogOpen(false)
+        fetchBranches() // Refresh list
+      } else {
+        toast.error(data.error || 'Có lỗi xảy ra')
+      }
+    } catch (error) {
+      console.error('Error saving branch:', error)
+      toast.error('Lỗi kết nối')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -86,7 +172,7 @@ export function BranchesManager() {
               <CardTitle>Quản lý chi nhánh</CardTitle>
               <CardDescription>Thêm, sửa, xóa các chi nhánh trong hệ thống</CardDescription>
             </div>
-            <Button onClick={handleAdd}>
+            <Button onClick={handleAdd} disabled={isLoading}>
               <Plus className="h-4 w-4 mr-2" />
               Thêm chi nhánh
             </Button>
@@ -94,33 +180,50 @@ export function BranchesManager() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {branchList.map((branch) => {
-              const city = cities.find((c) => c.id === branch.cityId)
-              return (
-                <Card key={branch.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <h3 className="font-semibold">{branch.name}</h3>
+            {branchList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Chưa có chi nhánh nào
+              </p>
+            ) : (
+              branchList.map((branch) => {
+                const city = typeof branch.cityId === 'object' ? branch.cityId : null
+                return (
+                  <Card key={branch._id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <h3 className="font-semibold">{branch.name}</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{city?.name}</p>
+                          <p className="text-sm">{branch.address}</p>
+                          {branch.phone && <p className="text-sm text-muted-foreground">{branch.phone}</p>}
                         </div>
-                        <p className="text-sm text-muted-foreground">{city?.name}</p>
-                        <p className="text-sm">{branch.address}</p>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => handleEdit(branch)}
+                            disabled={isLoading}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => handleDelete(branch._id)}
+                            disabled={isLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="icon" onClick={() => handleEdit(branch)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => handleDelete(branch.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                    </CardContent>
+                  </Card>
+                )
+              })
+            )}
           </div>
         </CardContent>
       </Card>
@@ -143,17 +246,22 @@ export function BranchesManager() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="city">Tỉnh thành</Label>
-                <Select value={formData.cityId} onValueChange={(value) => setFormData({ ...formData, cityId: value })}>
+                <Select 
+                  value={formData.cityId} 
+                  onValueChange={(value) => setFormData({ ...formData, cityId: value })}
+                  disabled={isLoading}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn tỉnh thành" />
                   </SelectTrigger>
                   <SelectContent>
                     {cities.map((city) => (
-                      <SelectItem key={city.id} value={city.id}>
+                      <SelectItem key={city._id} value={city._id}>
                         {city.name}
                       </SelectItem>
                     ))}
@@ -168,14 +276,32 @@ export function BranchesManager() {
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Số điện thoại</Label>
+                <Input
+                  id="phone"
+                  placeholder="028 1234 5678"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  disabled={isLoading}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsDialogOpen(false)}
+                disabled={isLoading}
+              >
                 Hủy
               </Button>
-              <Button type="submit">{editingBranch ? "Cập nhật" : "Thêm"}</Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Đang xử lý..." : (editingBranch ? "Cập nhật" : "Thêm")}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

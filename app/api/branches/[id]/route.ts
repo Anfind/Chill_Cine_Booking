@@ -48,3 +48,95 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     )
   }
 }
+
+/**
+ * PUT /api/branches/[id]
+ * Cập nhật thông tin branch
+ */
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await connectDB()
+    const { id } = await params
+    const body = await request.json()
+
+    // Update slug if name changed
+    if (body.name) {
+      body.slug = body.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+    }
+
+    const branch = await Branch.findByIdAndUpdate(
+      id,
+      { $set: body },
+      { new: true, runValidators: true }
+    ).populate('cityId', 'name code')
+
+    if (!branch) {
+      return NextResponse.json(
+        { success: false, error: 'Branch not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: branch,
+      message: 'Branch updated successfully',
+    })
+  } catch (error) {
+    console.error('Error updating branch:', error)
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to update branch',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/branches/[id]
+ * Xóa branch (soft delete)
+ */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await connectDB()
+    const { id } = await params
+
+    // Soft delete: set isActive = false
+    const branch = await Branch.findByIdAndUpdate(
+      id,
+      { isActive: false },
+      { new: true }
+    )
+
+    if (!branch) {
+      return NextResponse.json(
+        { success: false, error: 'Branch not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Branch deleted successfully',
+      data: branch,
+    })
+  } catch (error) {
+    console.error('Error deleting branch:', error)
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to delete branch',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+}
