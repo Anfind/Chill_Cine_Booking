@@ -3,7 +3,8 @@
  * Helper functions để fetch data từ MongoDB API
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+// Use relative URLs for API calls - works with ngrok and any domain
+const API_BASE_URL = typeof window !== 'undefined' ? '' : 'http://localhost:3000'
 
 export interface ApiResponse<T> {
   success: boolean
@@ -19,6 +20,8 @@ export interface ApiResponse<T> {
  */
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
   try {
+    // Always use relative URLs from client-side (browser)
+    // This ensures API calls work with ngrok or any domain
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`
 
     const response = await fetch(url, {

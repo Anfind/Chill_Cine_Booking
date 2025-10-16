@@ -172,20 +172,15 @@ export default function BookingPage({ params }: { params: Promise<{ roomId: stri
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <BookingForm
-                room={room}
-                selectedDate={selectedDate}
-                selectedStartTime={selectedBooking?.startTime}
-                selectedEndTime={selectedBooking?.endTime}
-                onSubmit={handleBookingSubmit}
-                onCancel={() => setShowBookingForm(false)}
-              />
-            </div>
-            <div className="lg:col-span-1">
-              <RoomDetailsPanel room={room} />
-            </div>
+          <div className="max-w-4xl mx-auto">
+            <BookingForm
+              room={room}
+              selectedDate={selectedDate}
+              selectedStartTime={selectedBooking?.startTime}
+              selectedEndTime={selectedBooking?.endTime}
+              onSubmit={handleBookingSubmit}
+              onCancel={() => setShowBookingForm(false)}
+            />
           </div>
         )}
       </div>

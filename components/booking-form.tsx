@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Clock, Film, ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react"
+import { CalendarIcon, Clock, Film, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { vi } from "date-fns/locale"
 import { cn } from "@/lib/utils"
@@ -274,6 +274,7 @@ export function BookingForm({
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-6 pt-6">
+          {/* Slideshow hình ảnh phòng */}
           <div className="space-y-3">
             <Label className="text-base font-semibold text-gray-800">Hình ảnh phòng</Label>
             <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 border-2 border-pink-200">
@@ -320,28 +321,8 @@ export function BookingForm({
             </div>
           </div>
 
-          {room.description && (
-            <div className="space-y-2 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border border-pink-200">
-              <Label className="text-base font-semibold text-gray-800">Mô tả phòng</Label>
-              <p className="text-sm text-gray-700 leading-relaxed">{room.description}</p>
-            </div>
-          )}
-
+          {/* Chọn gói combo */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold text-gray-800">Tiện ích phòng</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {room.amenities.map((amenity, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-pink-50 border border-pink-200">
-                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center">
-                    <Check className="h-3 w-3 text-white" />
-                  </div>
-                  <span className="text-sm text-gray-700">{amenity}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-4 border-t-2 border-pink-200">
             <Label className="text-base font-semibold text-gray-800">Chọn gói combo</Label>
             {isLoadingData ? (
               <div className="flex items-center justify-center py-8">
