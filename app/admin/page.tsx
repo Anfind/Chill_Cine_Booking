@@ -5,11 +5,12 @@ import { signOut, useSession } from "next-auth/react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Building2, DoorOpen, LayoutDashboard, Calendar, LogOut, User } from "lucide-react"
+import { Building2, DoorOpen, LayoutDashboard, Calendar, LogOut, User, MapPin } from "lucide-react"
 import { BranchesManager } from "@/components/admin/branches-manager"
 import { RoomsManager } from "@/components/admin/rooms-manager"
 import { BookingsOverview } from "@/components/admin/bookings-overview"
 import { BookingsManager } from "@/components/admin/bookings-manager"
+import { CitiesManager } from "@/components/admin/cities-manager"
 import { Badge } from "@/components/ui/badge"
 
 export default function AdminPage() {
@@ -33,7 +34,7 @@ export default function AdminPage() {
                   🔐 Protected
                 </Badge>
               </h1>
-              <p className="text-sm text-muted-foreground">Quản lý chi nhánh, phòng và đặt phòng</p>
+              <p className="text-sm text-muted-foreground">Quản lý tỉnh thành, chi nhánh, phòng và đặt phòng</p>
             </div>
 
             <div className="flex items-center gap-3">
@@ -68,7 +69,7 @@ export default function AdminPage() {
       {/* Content */}
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl grid-cols-4">
+          <TabsList className="grid w-full max-w-4xl grid-cols-5">
             <TabsTrigger value="overview" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Tổng quan</span>
@@ -76,6 +77,10 @@ export default function AdminPage() {
             <TabsTrigger value="bookings" className="gap-2">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Đặt phòng</span>
+            </TabsTrigger>
+            <TabsTrigger value="cities" className="gap-2">
+              <MapPin className="h-4 w-4" />
+              <span className="hidden sm:inline">Tỉnh thành</span>
             </TabsTrigger>
             <TabsTrigger value="branches" className="gap-2">
               <Building2 className="h-4 w-4" />
@@ -93,6 +98,10 @@ export default function AdminPage() {
 
           <TabsContent value="bookings" className="space-y-4">
             <BookingsManager />
+          </TabsContent>
+
+          <TabsContent value="cities" className="space-y-4">
+            <CitiesManager />
           </TabsContent>
 
           <TabsContent value="branches" className="space-y-4">

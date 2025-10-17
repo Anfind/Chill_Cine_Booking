@@ -304,7 +304,7 @@ export function RoomsManager() {
                           <p className="text-sm text-muted-foreground">{branch?.name}</p>
                           <div className="flex items-center gap-2 text-primary font-medium">
                             <DollarSign className="h-4 w-4" />
-                            {room.price.toLocaleString("vi-VN")}đ/giờ
+                            {typeof room.price === 'number' ? room.price.toLocaleString("vi-VN") : '0'}đ/giờ
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {room.amenities.map((amenity, idx) => (

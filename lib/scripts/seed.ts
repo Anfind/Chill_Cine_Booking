@@ -7,6 +7,7 @@ import Room from '../models/Room'
 import ComboPackage from '../models/ComboPackage'
 import MenuItem from '../models/MenuItem'
 import Booking from '../models/Booking'
+import User from '../models/User'
 
 async function seedDatabase() {
   try {
@@ -22,6 +23,7 @@ async function seedDatabase() {
     await ComboPackage.deleteMany({})
     await MenuItem.deleteMany({})
     await Booking.deleteMany({})
+    await User.deleteMany({})
 
     console.log('✅ Cleared existing data')
 
@@ -437,6 +439,19 @@ async function seedDatabase() {
     const bookings = await Booking.insertMany(bookingsData)
     console.log(`✅ Created ${bookings.length} sample bookings`)
 
+    // 8. Seed Admin User
+    console.log('\n👤 Creating admin user...')
+    
+    const adminUser = await User.create({
+      email: 'admin@chillcine.com',
+      password: 'Admin@123', // Will be hashed by pre-save hook
+      name: 'Admin',
+      role: 'admin',
+      isActive: true,
+    })
+    
+    console.log(`✅ Created admin user`)
+
     console.log('\n🎉 Database seeded successfully!')
     console.log('📊 Summary:')
     console.log(`   - Cities: ${cities.length}`)
@@ -446,9 +461,14 @@ async function seedDatabase() {
     console.log(`   - Combo Packages: ${combos.length}`)
     console.log(`   - Menu Items: ${menuItems.length}`)
     console.log(`   - Sample Bookings: ${bookings.length}`)
+    console.log(`   - Admin User: 1`)
     console.log(`\n📅 Booking dates:`)
     console.log(`   - Today (${today.toLocaleDateString('vi-VN')}): 5 bookings`)
     console.log(`   - Tomorrow (${tomorrow.toLocaleDateString('vi-VN')}): 8 bookings`)
+    console.log(`\n🔐 Admin Login:`)
+    console.log(`   - Email: admin@chillcine.com`)
+    console.log(`   - Password: Admin@123`)
+    console.log(`   - URL: http://localhost:3000/auth/login`)
 
     process.exit(0)
   } catch (error) {

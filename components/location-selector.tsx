@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { MapPin, ChevronRight, ChevronLeft, Loader2 } from "lucide-react"
@@ -113,9 +113,9 @@ export function LocationSelector({ open, onLocationSelected }: LocationSelectorP
           <DialogTitle className="text-lg sm:text-xl font-bold text-center">
             {step === "city" ? "Chọn tỉnh thành" : selectedCity?.name}
           </DialogTitle>
-          {step === "branch" && (
-            <p className="text-xs sm:text-sm text-muted-foreground text-center mt-1">Chọn chi nhánh của bạn</p>
-          )}
+          <DialogDescription className="text-xs sm:text-sm text-muted-foreground text-center">
+            {step === "city" ? "Chọn tỉnh/thành phố để xem các chi nhánh" : "Chọn chi nhánh của bạn"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 space-y-2 sm:space-y-3">

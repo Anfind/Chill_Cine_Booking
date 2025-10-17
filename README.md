@@ -64,7 +64,7 @@ Note: collection names may differ depending on your Mongoose model config. If th
 - CORS when testing via ngrok
   - This repo sets relative API calls and includes CORS middleware already
 - Admin auth
-  - Not enforced yet; see `ADMIN_AUTHENTICATION_GUIDE.md` for adding NextAuth
+  - Đã bật xác thực. Đăng nhập tại `/auth/login` (yêu cầu vai trò admin/staff)
 
 # 🎬 Chill Cine Hotel - Cinema Booking System
 
@@ -199,9 +199,7 @@ chill-cine-hotel/
 │   └── utils.ts             # Utilities
 ├── public/                  # Static assets
 ├── .env.local              # Environment variables
-├── DATABASE.md             # Database setup guide
 ├── DATABASE_SCHEMA.md      # Schema documentation
-├── SUMMARY.md              # Project summary
 └── package.json
 ```
 
@@ -271,9 +269,13 @@ pnpm start        # Start production server
 pnpm lint         # Run ESLint
 
 # Database
-pnpm db:seed      # Seed database with sample data
-pnpm db:seed-admin
+pnpm db:seed      # Seed all data (cities, branches, rooms, combos, menu, bookings, admin user)
 ```
+
+**Admin credentials sau khi seed:**
+- Email: `admin@chillcine.com`
+- Password: `Admin@123`
+- URL: http://localhost:3000/auth/login
 
 ---
 

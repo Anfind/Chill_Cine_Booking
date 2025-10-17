@@ -43,7 +43,8 @@ export async function middleware(request: NextRequest) {
     }
 
     // Check role - only admin and staff can access
-    if (token.role !== 'admin' && token.role !== 'staff') {
+    const userRole = (token as any).role
+    if (userRole !== 'admin' && userRole !== 'staff') {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }
