@@ -186,6 +186,43 @@ export function BookingForm({
       const endDateTime = new Date(date)
       endDateTime.setHours(endHour, endMin, 0, 0)
 
+      // Validation: Không được đặt giờ quá khứ (phải cách hiện tại ít nhất 5 phút)
+      const now = new Date()
+      const minBookingTime = new Date(now.getTime() + 5 * 60 * 1000) // +5 phút
+      
+      if (startDateTime < minBookingTime) {
+        toast({
+          title: "Lỗi thời gian",
+          description: "Không thể đặt phòng cho giờ quá khứ. Vui lòng chọn giờ bắt đầu ít nhất 5 phút sau thời điểm hiện tại.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validation: endTime phải sau startTime
+      if (endDateTime <= startDateTime) {
+        toast({
+          title: "Lỗi thời gian",
+          description: "Giờ kết thúc phải sau giờ bắt đầu",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validation: Duration tối thiểu 1 giờ
+      const minDuration = 1 * 60 * 60 * 1000 // 1 giờ
+      if (endDateTime.getTime() - startDateTime.getTime() < minDuration) {
+        toast({
+          title: "Lỗi thời gian",
+          description: "Thời gian đặt phòng tối thiểu là 1 giờ",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
       // Prepare booking data
       const bookingData = {
         roomId: room._id,
@@ -398,6 +435,9 @@ export function BookingForm({
                       required
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Phải cách hiện tại ít nhất 5 phút
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -413,6 +453,9 @@ export function BookingForm({
                       required
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tối thiểu 1 giờ
+                  </p>
                 </div>
               </div>
             </>

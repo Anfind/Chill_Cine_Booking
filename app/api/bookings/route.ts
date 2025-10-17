@@ -88,6 +88,48 @@ export async function POST(request: Request) {
       }
     }
 
+    // Parse and validate time
+    const startTime = new Date(body.startTime)
+    const endTime = new Date(body.endTime)
+    const now = new Date()
+    
+    // Rule 1: Không được đặt giờ quá khứ (phải cách hiện tại ít nhất 5 phút)
+    const minBookingTime = new Date(now.getTime() + 5 * 60 * 1000) // +5 phút
+    if (startTime < minBookingTime) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Không thể đặt phòng cho giờ quá khứ',
+          message: 'Vui lòng chọn giờ bắt đầu ít nhất 5 phút sau thời điểm hiện tại',
+          minTime: minBookingTime.toISOString(),
+        },
+        { status: 400 }
+      )
+    }
+
+    // Rule 2: endTime phải sau startTime
+    if (endTime <= startTime) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Giờ kết thúc phải sau giờ bắt đầu',
+        },
+        { status: 400 }
+      )
+    }
+
+    // Rule 3: Duration tối thiểu 1 giờ
+    const minDuration = 1 * 60 * 60 * 1000 // 1 giờ = 3600000ms
+    if (endTime.getTime() - startTime.getTime() < minDuration) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Thời gian đặt phòng tối thiểu là 1 giờ',
+        },
+        { status: 400 }
+      )
+    }
+
     // Get room info
     const room = await Room.findById(body.roomId)
     if (!room) {
@@ -101,9 +143,6 @@ export async function POST(request: Request) {
     }
 
     // Check for booking conflicts
-    const startTime = new Date(body.startTime)
-    const endTime = new Date(body.endTime)
-
     const conflictingBooking = await Booking.findOne({
       roomId: body.roomId,
       status: { $in: ['pending', 'confirmed', 'checked-in'] },
@@ -118,8 +157,10 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Room is already booked for this time slot',
+          error: 'Phòng đã được đặt trong khung giờ này',
+          message: 'Vui lòng chọn khung giờ khác',
           conflictingBooking: {
+            bookingCode: conflictingBooking.bookingCode,
             startTime: conflictingBooking.startTime,
             endTime: conflictingBooking.endTime,
           },

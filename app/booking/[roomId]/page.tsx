@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, Loader2 } from "lucide-react"
 import { TimelineBooking } from "@/components/timeline-booking"
-import { BookingForm } from "@/components/booking-form"
+import { BookingFormV2 } from "@/components/booking-form-v2"
 import { RoomDetailsPanel } from "@/components/room-details-panel"
 import { fetchRoomById, fetchRooms, fetchBookings } from "@/lib/api-client"
 import { format } from "date-fns"
@@ -54,6 +54,37 @@ export default function BookingPage({ params }: { params: Promise<{ roomId: stri
     loadData()
   }, [roomId, selectedDate])
 
+  // Auto reload when user comes back to the page (tab focus)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('🔄 Page visible again, reloading bookings...')
+        loadBookingsOnly()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [room, selectedDate])
+
+  // Auto refresh bookings every 1 minute (only timeline data, not whole page)
+  useEffect(() => {
+    if (!room) return // Wait until room is loaded
+
+    console.log('⏰ Auto-refresh enabled: every 60 seconds')
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing timeline data...')
+      loadBookingsOnly()
+    }, 60000) // 60 seconds = 1 minute
+
+    return () => {
+      console.log('⏰ Auto-refresh disabled')
+      clearInterval(interval)
+    }
+  }, [room, selectedDate])
+
   const loadData = async () => {
     setLoading(true)
     setError(null)
@@ -89,6 +120,26 @@ export default function BookingPage({ params }: { params: Promise<{ roomId: stri
       console.error('Error loading booking page data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Load only bookings data (for auto-refresh without reloading whole page)
+  const loadBookingsOnly = async () => {
+    if (!room) return
+
+    try {
+      const dateString = format(selectedDate, 'yyyy-MM-dd')
+      const bookingsResponse = await fetchBookings({
+        branchId: room.branchId._id,
+        date: dateString,
+      })
+      if (bookingsResponse.success && bookingsResponse.data) {
+        setAllBookings(bookingsResponse.data)
+        console.log('✅ Timeline data refreshed silently')
+      }
+    } catch (err) {
+      console.error('Error refreshing bookings:', err)
+      // Silent fail - don't show error to user
     }
   }
 
@@ -173,7 +224,7 @@ export default function BookingPage({ params }: { params: Promise<{ roomId: stri
           </div>
         ) : (
           <div className="max-w-4xl mx-auto">
-            <BookingForm
+            <BookingFormV2
               room={room}
               selectedDate={selectedDate}
               selectedStartTime={selectedBooking?.startTime}

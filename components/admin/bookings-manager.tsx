@@ -166,7 +166,7 @@ export function BookingsManager() {
   }
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm('Bạn có chắc muốn hủy booking này?')) return
+    if (!confirm('Bạn có chắc muốn hủy booking này? Booking sẽ biến mất khỏi timeline.')) return
 
     await handleUpdateStatus(bookingId, 'cancelled')
   }
@@ -358,6 +358,7 @@ export function BookingsManager() {
                             Chi tiết
                           </Button>
                           
+                          {/* Chỉ cho phép hủy booking ở trạng thái pending và confirmed */}
                           {booking.status !== 'cancelled' && booking.status !== 'checked-out' && (
                             <Button
                               variant="destructive"
@@ -537,6 +538,7 @@ export function BookingsManager() {
               </Card>
 
               {/* Actions */}
+              {/* Chỉ hiển thị actions cho booking chưa cancelled/checked-out */}
               {selectedBooking.status !== 'cancelled' && selectedBooking.status !== 'checked-out' && (
                 <Card>
                   <CardHeader>
@@ -568,11 +570,13 @@ export function BookingsManager() {
                           Check-out
                         </Button>
                       )}
+                      {/* Nút hủy - chỉ cho pending và confirmed */}
                       <Button
                         size="sm"
                         variant="destructive"
                         onClick={() => handleCancelBooking(selectedBooking._id)}
                       >
+                        <X className="h-4 w-4 mr-1" />
                         Hủy booking
                       </Button>
                     </div>

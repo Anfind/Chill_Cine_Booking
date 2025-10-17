@@ -136,6 +136,11 @@ export function TimelineBooking({
       
       if (bookingRoomId !== roomId) return false
 
+      // Filter out cancelled and checked-out bookings from timeline
+      if (booking.status === 'cancelled' || booking.status === 'checked-out') {
+        return false
+      }
+
       const start = new Date(booking.startTime)
       const end = new Date(booking.endTime)
       const slotTime = new Date(selectedDate)
@@ -231,7 +236,17 @@ export function TimelineBooking({
             {rooms.map((room, index) => {
               const roomBookings = bookings.filter((b) => {
                 const bookingRoomId = typeof b.roomId === 'string' ? b.roomId : b.roomId._id
-                return bookingRoomId === room._id
+                
+                // Filter: Chỉ hiển thị booking đang active (pending, confirmed, checked-in)
+                // Loại bỏ cancelled và checked-out khỏi timeline
+                const isActive = b.status !== 'cancelled' && b.status !== 'checked-out'
+                
+                // Debug: uncomment để debug
+                // if (bookingRoomId === room._id) {
+                //   console.log('🔍 Booking:', b._id, 'Status:', b.status, 'Show:', isActive)
+                // }
+                
+                return bookingRoomId === room._id && isActive
               })
 
               return (
