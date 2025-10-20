@@ -14,6 +14,10 @@ if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local')
 }
 
+// Log connection info (hide password)
+const maskedUri = MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')
+console.log(`📡 Connecting to: ${maskedUri}`)
+
 /**
  * Global is used here to maintain a cached connection across hot reloads
  * in development. This prevents connections growing exponentially

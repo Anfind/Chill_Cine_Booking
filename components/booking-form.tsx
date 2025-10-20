@@ -80,6 +80,7 @@ export function BookingForm({
   )
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
+  const [customerCCCD, setCustomerCCCD] = useState("")
   const [selectedCombo, setSelectedCombo] = useState<string | null>(null)
   const [selectedMenuItems, setSelectedMenuItems] = useState<Record<string, number>>({})
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -165,10 +166,22 @@ export function BookingForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!date || !customerName || !customerPhone) {
+    // Validation: Required fields
+    if (!date || !customerName || !customerPhone || !customerCCCD) {
       toast({
         title: "Lỗi",
-        description: "Vui lòng điền đầy đủ thông tin",
+        description: "Vui lòng điền đầy đủ thông tin (Họ tên, SĐT, CCCD)",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validation: CCCD format
+    const cccdRegex = /^\d{9}$|^\d{12}$/
+    if (!cccdRegex.test(customerCCCD)) {
+      toast({
+        title: "CCCD không hợp lệ",
+        description: "CCCD phải là 12 chữ số hoặc CMND cũ 9 chữ số",
         variant: "destructive",
       })
       return
@@ -231,6 +244,7 @@ export function BookingForm({
         customerInfo: {
           name: customerName,
           phone: customerPhone,
+          cccd: customerCCCD,
         },
         services: {
           comboPackageId: selectedCombo || undefined,
@@ -546,6 +560,37 @@ export function BookingForm({
               className="border-pink-200"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cccd">CCCD/CMND *</Label>
+            <Input
+              id="cccd"
+              type="text"
+              placeholder="Nhập số CCCD (12 số) hoặc CMND (9 số)"
+              value={customerCCCD}
+              onChange={(e) => {
+                // Chỉ cho phép nhập số
+                const value = e.target.value.replace(/\D/g, '')
+                if (value.length <= 12) {
+                  setCustomerCCCD(value)
+                }
+              }}
+              className={cn(
+                "border-pink-200",
+                customerCCCD && !(/^\d{9}$|^\d{12}$/.test(customerCCCD)) && "border-red-500"
+              )}
+              maxLength={12}
+              required
+            />
+            {customerCCCD && !(/^\d{9}$|^\d{12}$/.test(customerCCCD)) && (
+              <p className="text-xs text-red-500 mt-1">
+                CCCD phải là 12 chữ số hoặc CMND cũ 9 chữ số
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              * Bắt buộc theo quy định pháp luật về lưu trú
+            </p>
           </div>
 
           <div className="pt-4 border-t-2 border-pink-200 bg-gradient-to-r from-pink-50 to-purple-50 -mx-6 px-6 py-4 rounded-lg">

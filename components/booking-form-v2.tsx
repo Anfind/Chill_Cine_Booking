@@ -76,6 +76,7 @@ export function BookingFormV2({
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
   const [customerEmail, setCustomerEmail] = useState("")
+  const [customerCCCD, setCustomerCCCD] = useState("")
 
   // Loading states
   const [isLoadingData, setIsLoadingData] = useState(true)
@@ -214,6 +215,18 @@ export function BookingFormV2({
       return false
     }
 
+    // Validate CCCD
+    if (!customerCCCD.trim()) {
+      toast.error('Vui lòng nhập số CCCD/CMND')
+      return false
+    }
+
+    const cccdRegex = /^\d{9}$|^\d{12}$/
+    if (!cccdRegex.test(customerCCCD.trim())) {
+      toast.error('CCCD phải là 12 chữ số hoặc CMND cũ 9 chữ số')
+      return false
+    }
+
     return true
   }
 
@@ -242,6 +255,7 @@ export function BookingFormV2({
           name: customerName.trim(),
           phone: customerPhone.trim(),
           email: customerEmail.trim() || undefined,
+          cccd: customerCCCD.trim(),
         },
         bookingDate: date,
         startTime: timeCalc.start,
@@ -549,6 +563,39 @@ export function BookingFormV2({
                   className="mt-1"
                   required
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="cccd">
+                  CCCD/CMND <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="cccd"
+                  type="text"
+                  value={customerCCCD}
+                  onChange={(e) => {
+                    // Chỉ cho phép nhập số
+                    const value = e.target.value.replace(/\D/g, '')
+                    if (value.length <= 12) {
+                      setCustomerCCCD(value)
+                    }
+                  }}
+                  placeholder="Nhập số CCCD (12 số) hoặc CMND (9 số)"
+                  className={cn(
+                    "mt-1",
+                    customerCCCD && !(/^\d{9}$|^\d{12}$/.test(customerCCCD)) && "border-red-500"
+                  )}
+                  maxLength={12}
+                  required
+                />
+                {customerCCCD && !(/^\d{9}$|^\d{12}$/.test(customerCCCD)) && (
+                  <p className="text-xs text-red-500 mt-1">
+                    CCCD phải là 12 chữ số hoặc CMND cũ 9 chữ số
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  * Bắt buộc theo quy định pháp luật về lưu trú
+                </p>
               </div>
 
               <div>
