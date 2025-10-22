@@ -25,6 +25,7 @@ interface Booking {
   startTime: Date | string
   endTime: Date | string
   status: string
+  paymentStatus?: 'unpaid' | 'paid' | 'refunded'  // Add payment status
   customerInfo?: {
     name: string
     phone: string
@@ -192,9 +193,24 @@ export function TimelineBooking({
               <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
-          <Button variant="ghost" size="sm" onClick={goToToday} className="h-7 sm:h-8 text-xs px-2 sm:px-3">
-            Hôm nay
-          </Button>
+          
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Legend for booking colors */}
+            <div className="hidden md:flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-gradient-to-r from-amber-400 to-yellow-500" />
+                <span className="text-muted-foreground">Chờ thanh toán</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-gradient-to-r from-rose-400 to-rose-500" />
+                <span className="text-muted-foreground">Đã thanh toán</span>
+              </div>
+            </div>
+            
+            <Button variant="ghost" size="sm" onClick={goToToday} className="h-7 sm:h-8 text-xs px-2 sm:px-3">
+              Hôm nay
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -285,11 +301,20 @@ export function TimelineBooking({
                         const { left, width } = getBookingPosition(booking)
                         const start = new Date(booking.startTime)
                         const end = new Date(booking.endTime)
+                        
+                        // Determine color based on payment status
+                        const isPending = booking.status === 'pending' && booking.paymentStatus === 'unpaid'
+                        const colorClasses = isPending
+                          ? "bg-gradient-to-r from-amber-400 via-yellow-500 to-yellow-500 dark:from-amber-500 dark:via-yellow-600 dark:to-yellow-600 border-yellow-600/10"
+                          : "bg-gradient-to-r from-rose-400 via-rose-500 to-rose-500 dark:from-rose-500 dark:via-rose-600 dark:to-rose-600 border-rose-600/10"
 
                         return (
                           <div
                             key={booking._id}
-                            className="absolute top-1.5 sm:top-2 h-9 sm:h-10 bg-gradient-to-r from-rose-400 via-rose-500 to-rose-500 dark:from-rose-500 dark:via-rose-600 dark:to-rose-600 rounded-md flex items-center justify-between px-1.5 sm:px-2.5 text-white text-[9px] sm:text-[11px] font-medium shadow-sm hover:shadow-md transition-all cursor-pointer border border-rose-600/10 hover:scale-[1.02] group"
+                            className={cn(
+                              "absolute top-1.5 sm:top-2 h-9 sm:h-10 rounded-md flex items-center justify-between px-1.5 sm:px-2.5 text-white text-[9px] sm:text-[11px] font-medium shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-[1.02] group",
+                              colorClasses
+                            )}
                             style={{
                               left: `${left}px`,
                               width: `${Math.max(width - 2, 50)}px`,
@@ -307,6 +332,7 @@ export function TimelineBooking({
                             {booking.customerInfo?.name && (
                               <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                 {booking.customerInfo.name}
+                                {isPending && <span className="ml-1 text-yellow-300">(Chờ thanh toán)</span>}
                               </div>
                             )}
                           </div>

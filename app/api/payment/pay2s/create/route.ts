@@ -54,6 +54,30 @@ export async function POST(request: Request) {
       )
     }
     
+    // 1.5. Check if QR was already created and still valid
+    let qrCreatedAt = booking.paymentQRCreatedAt
+    const now = new Date()
+    
+    // If QR was created less than 10 minutes ago, reuse the timestamp
+    if (qrCreatedAt) {
+      const elapsed = (now.getTime() - new Date(qrCreatedAt).getTime()) / 1000 // seconds
+      if (elapsed < 600) { // 10 minutes = 600 seconds
+        console.log(`♻️  Reusing existing QR timestamp (${Math.floor(elapsed)}s ago)`)
+      } else {
+        // QR expired, create new timestamp
+        qrCreatedAt = now
+        booking.paymentQRCreatedAt = now
+        await booking.save()
+        console.log('🆕 QR expired, creating new timestamp')
+      }
+    } else {
+      // First time creating QR
+      qrCreatedAt = now
+      booking.paymentQRCreatedAt = now
+      await booking.save()
+      console.log('🆕 First time creating QR timestamp')
+    }
+    
     // 2. Prepare Pay2S request parameters
     const partnerCode = process.env.PAY2S_PARTNER_CODE!
     const accessKey = process.env.PAY2S_ACCESS_KEY!
@@ -195,6 +219,7 @@ export async function POST(request: Request) {
       transactionId: data.transId || requestId,
       amount: booking.pricing.total,
       bookingCode: booking.bookingCode,
+      createdAt: qrCreatedAt.toISOString(), // Thời điểm tạo QR (có thể reuse)
       expiredAt: data.expiredAt,
       bankInfo: {
         bank: process.env.PAY2S_BANK_CODE,

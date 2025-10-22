@@ -194,13 +194,17 @@ export function BookingsOverview() {
                 <div key={booking._id} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
                   <div className="space-y-1 flex-1">
                     <p className="font-medium">
-                      {booking.roomCode} - {booking.customer}
+                      {booking.bookingCode} • {booking.roomCode} - {booking.customer}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {format(new Date(booking.startTime), 'dd/MM/yyyy • HH:mm', { locale: vi })} - 
                       {format(new Date(booking.endTime), 'HH:mm', { locale: vi })}
                     </p>
-                    <p className="text-xs text-muted-foreground">{booking.branch}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{booking.branch}</span>
+                      <span>•</span>
+                      <span>Tạo: {format(new Date(booking.createdAt), 'dd/MM HH:mm', { locale: vi })}</span>
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="text-sm font-semibold">

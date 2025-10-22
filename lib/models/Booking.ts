@@ -36,6 +36,7 @@ export interface IBooking extends Document {
   paymentStatus: 'unpaid' | 'paid' | 'refunded'
   paymentMethod?: 'card' | 'ewallet' | 'bank' | 'cash'
   paymentTransactionId?: string // Pay2S transaction ID
+  paymentQRCreatedAt?: Date // Thời điểm tạo QR code
   notes?: string
   checkInTime?: Date
   checkOutTime?: Date
@@ -182,6 +183,9 @@ const BookingSchema = new Schema<IBooking>(
     paymentTransactionId: {
       type: String,
       trim: true,
+    },
+    paymentQRCreatedAt: {
+      type: Date,
     },
     notes: {
       type: String,

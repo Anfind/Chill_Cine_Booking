@@ -5,12 +5,14 @@ import { signOut, useSession } from "next-auth/react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Building2, DoorOpen, LayoutDashboard, Calendar, LogOut, User, MapPin } from "lucide-react"
+import { Building2, DoorOpen, LayoutDashboard, Calendar, LogOut, User, MapPin, Package, Coffee } from "lucide-react"
 import { BranchesManager } from "@/components/admin/branches-manager"
 import { RoomsManager } from "@/components/admin/rooms-manager"
 import { BookingsOverview } from "@/components/admin/bookings-overview"
 import { BookingsManager } from "@/components/admin/bookings-manager"
 import { CitiesManager } from "@/components/admin/cities-manager"
+import { CombosManager } from "@/components/admin/combos-manager"
+import { MenuItemsManager } from "@/components/admin/menu-items-manager"
 import { Badge } from "@/components/ui/badge"
 
 export default function AdminPage() {
@@ -69,7 +71,7 @@ export default function AdminPage() {
       {/* Content */}
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-4xl grid-cols-5">
+          <TabsList className="grid w-full max-w-6xl grid-cols-7 gap-1">
             <TabsTrigger value="overview" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Tổng quan</span>
@@ -89,6 +91,14 @@ export default function AdminPage() {
             <TabsTrigger value="rooms" className="gap-2">
               <DoorOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Phòng</span>
+            </TabsTrigger>
+            <TabsTrigger value="combos" className="gap-2">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Combo</span>
+            </TabsTrigger>
+            <TabsTrigger value="menu-items" className="gap-2">
+              <Coffee className="h-4 w-4" />
+              <span className="hidden sm:inline">Dịch vụ</span>
             </TabsTrigger>
           </TabsList>
 
@@ -110,6 +120,14 @@ export default function AdminPage() {
 
           <TabsContent value="rooms" className="space-y-4">
             <RoomsManager />
+          </TabsContent>
+
+          <TabsContent value="combos" className="space-y-4">
+            <CombosManager />
+          </TabsContent>
+
+          <TabsContent value="menu-items" className="space-y-4">
+            <MenuItemsManager />
           </TabsContent>
         </Tabs>
       </div>

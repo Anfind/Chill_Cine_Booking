@@ -8,11 +8,12 @@ export const dynamic = 'force-dynamic'
  * GET /api/cities/[id]
  * Lấy thông tin chi tiết một city
  */
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
+    const { id } = await params
 
-    const city = await City.findById(params.id).lean()
+    const city = await City.findById(id).lean()
 
     if (!city) {
       return NextResponse.json(
@@ -45,9 +46,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
  * PUT /api/cities/[id]
  * Cập nhật thông tin city
  */
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
+    const { id } = await params
 
     const body = await request.json()
     const { code, name, slug, isActive, displayOrder } = body
@@ -64,7 +66,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }
 
     // Check if city exists
-    const existingCity = await City.findById(params.id)
+    const existingCity = await City.findById(id)
     if (!existingCity) {
       return NextResponse.json(
         {
@@ -79,7 +81,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (code && code !== existingCity.code) {
       const duplicateCode = await City.findOne({ 
         code: code.toLowerCase(),
-        _id: { $ne: params.id }
+        _id: { $ne: id }
       })
       if (duplicateCode) {
         return NextResponse.json(
@@ -135,12 +137,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
  * DELETE /api/cities/[id]
  * Xóa city (chỉ xóa nếu không còn branch nào)
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
+    const { id } = await params
 
     // Check if city exists
-    const city = await City.findById(params.id)
+    const city = await City.findById(id)
     if (!city) {
       return NextResponse.json(
         {
@@ -152,7 +155,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
 
     // Check if city has any branches
-    const branchCount = await Branch.countDocuments({ cityId: params.id })
+    const branchCount = await Branch.countDocuments({ cityId: id })
     if (branchCount > 0) {
       return NextResponse.json(
         {
@@ -164,7 +167,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       )
     }
 
-    await City.findByIdAndDelete(params.id)
+    await City.findByIdAndDelete(id)
 
     return NextResponse.json({
       success: true,

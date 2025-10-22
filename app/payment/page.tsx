@@ -76,6 +76,62 @@ function PaymentContent() {
     const createPayment = async () => {
       setIsCreatingPayment(true)
       try {
+        // Clean up expired payment cache from localStorage
+        const cleanupExpiredCache = () => {
+          const now = Date.now()
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('payment_')) {
+              try {
+                const cached = JSON.parse(localStorage.getItem(key) || '{}')
+                if (cached.createdAt) {
+                  const elapsed = (now - new Date(cached.createdAt).getTime()) / 1000
+                  if (elapsed >= 600) {
+                    console.log(`🗑️  Removing expired cache: ${key}`)
+                    localStorage.removeItem(key)
+                  }
+                }
+              } catch (e) {
+                // Invalid cache, remove it
+                localStorage.removeItem(key)
+              }
+            }
+          })
+        }
+        
+        // Cleanup first
+        cleanupExpiredCache()
+        
+        // Try to get existing payment data from localStorage
+        const storageKey = `payment_${bookingId}`
+        const cached = localStorage.getItem(storageKey)
+        
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached)
+            // Check if cache is still valid (within 10 minutes)
+            const createdTime = new Date(cachedData.createdAt).getTime()
+            const now = Date.now()
+            const elapsed = Math.floor((now - createdTime) / 1000)
+            
+            if (elapsed < 600) {
+              console.log(`♻️  Using cached payment data for booking ${bookingId}`)
+              setPaymentData(cachedData)
+              const remaining = Math.max(0, 600 - elapsed)
+              setTimeLeft(remaining)
+              setIsPolling(true)
+              setIsCreatingPayment(false)
+              return
+            } else {
+              console.log('🗑️  Cache expired, creating new payment')
+              localStorage.removeItem(storageKey)
+            }
+          } catch (e) {
+            console.error('Error parsing cached payment data:', e)
+            localStorage.removeItem(storageKey)
+          }
+        }
+        
+        // Create new payment
         const res = await fetch("/api/payment/pay2s/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -88,7 +144,20 @@ function PaymentContent() {
           throw new Error(data.error || "Không thể tạo thanh toán")
         }
 
+        // Save to localStorage
+        localStorage.setItem(storageKey, JSON.stringify(data))
+        
         setPaymentData(data)
+        
+        // Tính thời gian còn lại dựa trên createdAt
+        if (data.createdAt) {
+          const createdTime = new Date(data.createdAt).getTime()
+          const now = Date.now()
+          const elapsed = Math.floor((now - createdTime) / 1000) // seconds đã trôi qua
+          const remaining = Math.max(0, 600 - elapsed) // 600s = 10 phút
+          setTimeLeft(remaining)
+        }
+        
         setIsPolling(true)
       } catch (err: any) {
         toast.error(err.message)
@@ -113,6 +182,11 @@ function PaymentContent() {
         if (data.success && data.data.paymentStatus === "paid") {
           setIsPolling(false)
           clearInterval(interval)
+          
+          // Clear cache when payment successful
+          const storageKey = `payment_${bookingId}`
+          localStorage.removeItem(storageKey)
+          
           toast.success("Thanh toán thành công!")
           setTimeout(() => {
             router.push(`/payment/success?bookingId=${bookingId}&code=${data.data.bookingCode}`)
@@ -134,7 +208,17 @@ function PaymentContent() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer)
-          setError("Hết thời gian thanh toán. Vui lòng đặt lại.")
+          
+          // Show toast notification
+          toast.error("Hết thời gian thanh toán. Đơn đặt phòng đã bị huỷ.", {
+            duration: 5000,
+          })
+          
+          // Redirect to home after 2 seconds
+          setTimeout(() => {
+            router.push("/")
+          }, 2000)
+          
           return 0
         }
         return prev - 1
@@ -142,7 +226,7 @@ function PaymentContent() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [paymentData, timeLeft])
+  }, [paymentData, timeLeft, router])
 
   // Copy to clipboard helper
   const copyToClipboard = (text: string, label: string) => {

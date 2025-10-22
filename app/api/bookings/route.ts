@@ -167,6 +167,8 @@ export async function POST(request: Request) {
     }
 
     // Check for booking conflicts
+    // Block all active bookings (pending, confirmed, checked-in)
+    // When user confirms booking, it shows on timeline and prevents others from booking
     const conflictingBooking = await Booking.findOne({
       roomId: body.roomId,
       status: { $in: ['pending', 'confirmed', 'checked-in'] },

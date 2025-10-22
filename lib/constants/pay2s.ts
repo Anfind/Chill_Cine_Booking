@@ -65,7 +65,7 @@ export const PAY2S_CONFIG = {
   IPN_TIMEOUT_SECONDS: 30,
   
   // QR Code expiry
-  QR_EXPIRY_MINUTES: 15,
+  QR_EXPIRY_MINUTES: 10,
   
   // Polling interval for frontend
   PAYMENT_STATUS_POLL_INTERVAL_MS: 3000, // 3 seconds
