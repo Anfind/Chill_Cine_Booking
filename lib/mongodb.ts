@@ -3,8 +3,8 @@ import mongoose from 'mongoose'
 declare global {
   // eslint-disable-next-line no-var
   var mongoose: {
-    conn: typeof mongoose | null
-    promise: Promise<typeof mongoose> | null
+    conn: any
+    promise: Promise<any> | null
   }
 }
 
@@ -13,6 +13,10 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/chill-
 if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local')
 }
+
+// Log connection info (hide password)
+const maskedUri = MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')
+console.log(`📡 Connecting to: ${maskedUri}`)
 
 /**
  * Global is used here to maintain a cached connection across hot reloads

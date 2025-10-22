@@ -9,6 +9,7 @@ export interface IBooking extends Document {
     name: string
     phone: string
     email?: string
+    cccd: string // Căn cước công dân (12 chữ số)
   }
   bookingDate: Date
   startTime: Date
@@ -34,6 +35,8 @@ export interface IBooking extends Document {
   status: 'pending' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled'
   paymentStatus: 'unpaid' | 'paid' | 'refunded'
   paymentMethod?: 'card' | 'ewallet' | 'bank' | 'cash'
+  paymentTransactionId?: string // Pay2S transaction ID
+  paymentQRCreatedAt?: Date // Thời điểm tạo QR code
   notes?: string
   checkInTime?: Date
   checkOutTime?: Date
@@ -81,6 +84,19 @@ const BookingSchema = new Schema<IBooking>(
         type: String,
         trim: true,
         lowercase: true,
+      },
+      cccd: {
+        type: String,
+        required: true,
+        trim: true,
+        validate: {
+          validator: function(v: string) {
+            // CCCD mới: 12 chữ số
+            // CMND cũ: 9 hoặc 12 chữ số
+            return /^\d{9}$|^\d{12}$/.test(v)
+          },
+          message: 'CCCD/CMND phải là 9 hoặc 12 chữ số'
+        }
       },
     },
     bookingDate: {
@@ -163,6 +179,13 @@ const BookingSchema = new Schema<IBooking>(
     paymentMethod: {
       type: String,
       enum: ['card', 'ewallet', 'bank', 'cash'],
+    },
+    paymentTransactionId: {
+      type: String,
+      trim: true,
+    },
+    paymentQRCreatedAt: {
+      type: Date,
     },
     notes: {
       type: String,

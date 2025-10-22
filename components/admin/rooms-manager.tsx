@@ -37,13 +37,14 @@ interface RoomType {
 interface Room {
   _id: string
   name: string
+  code?: string
   branchId: { _id: string; name: string } | string
   roomTypeId: { _id: string; name: string; color: string } | string
   description: string
   images: string[]
   amenities: string[]
   capacity: number
-  price: number
+  pricePerHour: number
   status: string
 }
 
@@ -148,7 +149,7 @@ export function RoomsManager() {
       roomTypeId: typeof room.roomTypeId === 'object' ? room.roomTypeId._id : room.roomTypeId,
       description: room.description || "",
       capacity: room.capacity.toString(),
-      price: room.price.toString(),
+      price: room.pricePerHour.toString(),
       amenities: room.amenities.join(", "),
       images: room.images.join("\n"),
       status: room.status,
@@ -304,7 +305,7 @@ export function RoomsManager() {
                           <p className="text-sm text-muted-foreground">{branch?.name}</p>
                           <div className="flex items-center gap-2 text-primary font-medium">
                             <DollarSign className="h-4 w-4" />
-                            {typeof room.price === 'number' ? room.price.toLocaleString("vi-VN") : '0'}đ/giờ
+                            {typeof room.pricePerHour === 'number' ? room.pricePerHour.toLocaleString("vi-VN") : '0'}đ/giờ
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {room.amenities.map((amenity, idx) => (

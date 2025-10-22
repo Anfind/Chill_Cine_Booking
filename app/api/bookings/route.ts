@@ -88,6 +88,30 @@ export async function POST(request: Request) {
       }
     }
 
+    // Validate customerInfo fields
+    if (!body.customerInfo.name || !body.customerInfo.phone || !body.customerInfo.cccd) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Thiếu thông tin khách hàng (họ tên, số điện thoại, CCCD)',
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate CCCD format (9 or 12 digits)
+    const cccdRegex = /^\d{9}$|^\d{12}$/
+    if (!cccdRegex.test(body.customerInfo.cccd)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'CCCD/CMND không hợp lệ',
+          message: 'CCCD phải là 12 chữ số hoặc CMND cũ 9 chữ số',
+        },
+        { status: 400 }
+      )
+    }
+
     // Parse and validate time
     const startTime = new Date(body.startTime)
     const endTime = new Date(body.endTime)
@@ -143,6 +167,8 @@ export async function POST(request: Request) {
     }
 
     // Check for booking conflicts
+    // Block all active bookings (pending, confirmed, checked-in)
+    // When user confirms booking, it shows on timeline and prevents others from booking
     const conflictingBooking = await Booking.findOne({
       roomId: body.roomId,
       status: { $in: ['pending', 'confirmed', 'checked-in'] },
@@ -176,8 +202,27 @@ export async function POST(request: Request) {
     const duration = Math.ceil((endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60))
 
     // Calculate pricing
-    const roomTotal = body.comboPackageId ? body.comboPrice || 0 : room.pricePerHour * duration
-    const menuTotal = body.menuItems?.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0
+    let roomTotal = 0
+    
+    // If combo package is selected, fetch its price from database
+    if (body.comboPackageId || body.services?.comboPackageId) {
+      const comboId = body.comboPackageId || body.services?.comboPackageId
+      const ComboPackage = (await import('@/lib/models/ComboPackage')).default
+      const combo = await ComboPackage.findById(comboId)
+      if (combo) {
+        roomTotal = combo.price
+      } else {
+        // Fallback to hourly rate if combo not found
+        roomTotal = room.pricePerHour * duration
+      }
+    } else {
+      // No combo, use hourly rate
+      roomTotal = room.pricePerHour * duration
+    }
+    
+    // Extract menu items from either body.menuItems or body.services.menuItems
+    const menuItems = body.menuItems || body.services?.menuItems || []
+    const menuTotal = menuItems.reduce((sum: number, item: any) => sum + item.subtotal, 0) || 0
     const subtotal = roomTotal + menuTotal
     const tax = 0 // Can add VAT calculation here
     const discount = body.discount || 0
@@ -193,9 +238,9 @@ export async function POST(request: Request) {
       startTime,
       endTime,
       duration,
-      comboPackageId: body.comboPackageId,
+      comboPackageId: body.comboPackageId || body.services?.comboPackageId || undefined,
       roomPrice: room.pricePerHour,
-      menuItems: body.menuItems || [],
+      menuItems: body.menuItems || body.services?.menuItems || [],
       pricing: {
         roomTotal,
         menuTotal,

@@ -346,6 +346,13 @@ export function BookingsManager() {
                             </div>
                             
                             <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">Tạo đơn:</span>
+                              <span className="text-xs">
+                                {format(new Date(booking.createdAt), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
                               <span className="text-muted-foreground">Tổng tiền:</span>
                               <span className="font-semibold text-primary">{formatCurrency(booking.pricing.total)}</span>
                             </div>
@@ -442,6 +449,12 @@ export function BookingsManager() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Thời lượng:</span>
                     <span>{selectedBooking.duration} giờ</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tạo đơn lúc:</span>
+                    <span className="font-medium text-primary">
+                      {format(new Date(selectedBooking.createdAt), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}
+                    </span>
                   </div>
                   {selectedBooking.comboPackageId && typeof selectedBooking.comboPackageId === 'object' && (
                     <div className="flex justify-between">

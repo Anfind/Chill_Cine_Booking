@@ -99,9 +99,10 @@ export async function POST(request: Request) {
       images: body.images || [],
       amenities: body.amenities || [],
       capacity: body.capacity || 2,
-      price: body.price || 0,
+      pricePerHour: body.price || 0,
       status: body.status || 'available',
       isActive: true,
+      code: body.code || `R${Date.now().toString().slice(-6)}`, // Generate code if not provided
     })
 
     // Populate before returning

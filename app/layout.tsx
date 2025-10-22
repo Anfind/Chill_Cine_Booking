@@ -9,6 +9,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/components/auth-provider"
 import "./globals.css"
 
+// Initialize cron jobs on server startup
+import "@/lib/cron"
+
 export const metadata: Metadata = {
   title: "Chill Cine Hotel - Cinemax",
   description: "Trải nghiệm xem phim riêng tư với Netflix, board game và nhiều tiện ích khác",
