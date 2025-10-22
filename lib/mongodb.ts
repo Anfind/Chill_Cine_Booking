@@ -42,12 +42,24 @@ async function connectDB() {
       socketTimeoutMS: 45000,
       serverSelectionTimeoutMS: 10000,
       family: 4, // Use IPv4, skip trying IPv6
+      // Serverless-specific options for Vercel
+      serverApi: {
+        version: '1' as const,
+        strict: true,
+        deprecationErrors: true,
+      },
     }
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      console.log('✅ MongoDB connected successfully')
-      return mongoose
-    })
+    cached.promise = mongoose.connect(MONGODB_URI, opts)
+      .then((mongoose) => {
+        console.log('✅ MongoDB connected successfully')
+        return mongoose
+      })
+      .catch((error) => {
+        console.error('❌ MongoDB connection error:', error)
+        cached.promise = null
+        throw error
+      })
   }
 
   try {
