@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
     "dev": "next dev",
-    "lint": "eslint .",
+    "build": "next build",
     "start": "next start",
-    "db:seed": "dotenv -e .env.local -- tsx lib/scripts/seed.ts"
+    "lint": "next lint",
+    "db:seed": "dotenv -e .env.local -- tsx lib/scripts/seed.ts",
+    "db:indexes": "dotenv -e .env.local -- tsx lib/scripts/create-indexes.ts",
+    "db:optimize": "pnpm db:seed && pnpm db:indexes",
+    "vercel-build": "next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -30,12 +30,23 @@ import Booking from '@/lib/models/Booking'
  */
 export async function POST(request: Request) {
   try {
-    // Security: Check authorization header
+    // Security: Check authorization
+    // Allow if:
+    // 1. Called from Vercel Cron (has VERCEL_CRON_SECRET header)
+    // 2. Has valid Bearer token with CRON_SECRET
     const authHeader = request.headers.get('authorization')
+    const vercelCronSecret = request.headers.get('x-vercel-cron-signature')
     const cronSecret = process.env.CRON_SECRET || 'default-cron-secret-change-me'
     
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      console.warn('⚠️  Unauthorized cleanup attempt')
+    const isVercelCron = !!vercelCronSecret && process.env.VERCEL === '1'
+    const isValidBearerToken = authHeader === `Bearer ${cronSecret}`
+    
+    if (!isVercelCron && !isValidBearerToken) {
+      console.warn('⚠️  Unauthorized cleanup attempt', {
+        hasVercelCronHeader: !!vercelCronSecret,
+        hasAuthHeader: !!authHeader,
+        isVercel: process.env.VERCEL === '1'
+      })
       return NextResponse.json(
         { 
           success: false, 
@@ -44,6 +55,10 @@ export async function POST(request: Request) {
         { status: 401 }
       )
     }
+
+    console.log('✅ Authorized cleanup request', {
+      source: isVercelCron ? 'Vercel Cron' : 'Bearer Token'
+    })
 
     await connectDB()
 
