@@ -75,8 +75,7 @@ UserSchema.methods.comparePassword = async function (candidatePassword: string):
   }
 }
 
-// Indexes
-UserSchema.index({ email: 1 })
+// Indexes (email index is already created by unique: true)
 UserSchema.index({ role: 1, isActive: 1 })
 
 export default (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>('User', UserSchema)

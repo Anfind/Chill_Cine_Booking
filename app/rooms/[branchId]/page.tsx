@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ branchId:
   
   try {
     // Fetch branch from API for metadata
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://chill-cine.vercel.app'
     const res = await fetch(`${baseUrl}/api/branches/${branchId}`, {
       cache: 'no-store'
     })
