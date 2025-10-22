@@ -1,15 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Build configuration
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: true, // Tạm ignore để deploy nhanh
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: true, // Tạm ignore để deploy nhanh
   },
+  
+  // Image optimization
   images: {
-    unoptimized: true,
+    domains: ['images.unsplash.com', 'via.placeholder.com'],
+    formats: ['image/avif', 'image/webp'],
   },
-  // Allow ngrok and other external domains
+  
+  // CORS headers for API routes
   async headers() {
     return [
       {
@@ -22,6 +27,11 @@ const nextConfig = {
         ],
       },
     ]
+  },
+  
+  // Vercel-specific optimizations
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
 }
 

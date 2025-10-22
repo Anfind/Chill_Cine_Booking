@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
     "dev": "next dev",
-    "lint": "eslint .",
+    "build": "next build",
     "start": "next start",
-    "db:seed": "dotenv -e .env.local -- tsx lib/scripts/seed.ts"
+    "lint": "next lint",
+    "db:seed": "dotenv -e .env.local -- tsx lib/scripts/seed.ts",
+    "vercel-build": "next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
