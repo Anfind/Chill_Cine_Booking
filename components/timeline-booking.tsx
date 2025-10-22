@@ -9,18 +9,54 @@ import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { vi } from "date-fns/locale"
-import type { Room, Booking } from "@/lib/data"
+
+// MongoDB types
+interface Room {
+  _id: string
+  name: string
+  code: string
+  capacity: number
+  images: string[]
+}
+
+interface Booking {
+  _id: string
+  roomId: string | { _id: string }  // Can be populated or just ID
+  startTime: Date | string
+  endTime: Date | string
+  status: string
+  customerInfo?: {
+    name: string
+    phone: string
+    email?: string
+  }
+}
 
 interface TimelineBookingProps {
   rooms: Room[]
   bookings: Booking[]
+  selectedDate?: Date
+  onDateChange?: (date: Date) => void
   onBookingSelect: (roomId: string, startTime: Date, endTime: Date) => void
 }
 
-export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBookingProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+export function TimelineBooking({ 
+  rooms, 
+  bookings, 
+  selectedDate: propSelectedDate,
+  onDateChange,
+  onBookingSelect 
+}: TimelineBookingProps) {
+  const [selectedDate, setSelectedDate] = useState<Date>(propSelectedDate || new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Sync with prop
+  useEffect(() => {
+    if (propSelectedDate) {
+      setSelectedDate(propSelectedDate)
+    }
+  }, [propSelectedDate])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -43,16 +79,20 @@ export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBo
     const newDate = new Date(selectedDate)
     newDate.setDate(newDate.getDate() - 1)
     setSelectedDate(newDate)
+    onDateChange?.(newDate)
   }
 
   const goToNextDay = () => {
     const newDate = new Date(selectedDate)
     newDate.setDate(newDate.getDate() + 1)
     setSelectedDate(newDate)
+    onDateChange?.(newDate)
   }
 
   const goToToday = () => {
-    setSelectedDate(new Date())
+    const today = new Date()
+    setSelectedDate(today)
+    onDateChange?.(today)
   }
 
   const getCurrentTimePosition = () => {
@@ -89,7 +129,17 @@ export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBo
 
   const isSlotBooked = (roomId: string, hour: number) => {
     return bookings.some((booking) => {
-      if (booking.roomId !== roomId) return false
+      // Handle both populated and unpopulated roomId
+      const bookingRoomId = typeof booking.roomId === 'string' 
+        ? booking.roomId 
+        : booking.roomId._id
+      
+      if (bookingRoomId !== roomId) return false
+
+      // Filter out cancelled and checked-out bookings from timeline
+      if (booking.status === 'cancelled' || booking.status === 'checked-out') {
+        return false
+      }
 
       const start = new Date(booking.startTime)
       const end = new Date(booking.endTime)
@@ -184,11 +234,24 @@ export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBo
             </div>
 
             {rooms.map((room, index) => {
-              const roomBookings = bookings.filter((b) => b.roomId === room.id)
+              const roomBookings = bookings.filter((b) => {
+                const bookingRoomId = typeof b.roomId === 'string' ? b.roomId : b.roomId._id
+                
+                // Filter: Chỉ hiển thị booking đang active (pending, confirmed, checked-in)
+                // Loại bỏ cancelled và checked-out khỏi timeline
+                const isActive = b.status !== 'cancelled' && b.status !== 'checked-out'
+                
+                // Debug: uncomment để debug
+                // if (bookingRoomId === room._id) {
+                //   console.log('🔍 Booking:', b._id, 'Status:', b.status, 'Show:', isActive)
+                // }
+                
+                return bookingRoomId === room._id && isActive
+              })
 
               return (
                 <div
-                  key={room.id}
+                  key={room._id}
                   className={cn(
                     "flex border-b border-border/30 transition-colors hover:bg-muted/30",
                     index % 2 === 0 ? "bg-background" : "bg-muted/20",
@@ -201,7 +264,7 @@ export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBo
                   <div className="relative flex-1">
                     <div className="relative h-12 sm:h-14" style={{ width: "1440px" }}>
                       {hours.map((hour) => {
-                        const isBooked = isSlotBooked(room.id, hour)
+                        const isBooked = isSlotBooked(room._id, hour)
                         const isHighlighted = hour % 2 === 0 && hour >= 6 && hour <= 16
 
                         return (
@@ -213,7 +276,7 @@ export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBo
                               !isBooked && "hover:bg-primary/8 hover:border-primary/20 active:bg-primary/15",
                             )}
                             style={{ left: `${hour * 60}px` }}
-                            onClick={() => !isBooked && handleSlotClick(room.id, hour)}
+                            onClick={() => !isBooked && handleSlotClick(room._id, hour)}
                           />
                         )
                       })}
@@ -225,7 +288,7 @@ export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBo
 
                         return (
                           <div
-                            key={booking.id}
+                            key={booking._id}
                             className="absolute top-1.5 sm:top-2 h-9 sm:h-10 bg-gradient-to-r from-rose-400 via-rose-500 to-rose-500 dark:from-rose-500 dark:via-rose-600 dark:to-rose-600 rounded-md flex items-center justify-between px-1.5 sm:px-2.5 text-white text-[9px] sm:text-[11px] font-medium shadow-sm hover:shadow-md transition-all cursor-pointer border border-rose-600/10 hover:scale-[1.02] group"
                             style={{
                               left: `${left}px`,
@@ -241,9 +304,9 @@ export function TimelineBooking({ rooms, bookings, onBookingSelect }: TimelineBo
                               {end.getHours().toString().padStart(2, "0")}:
                               {end.getMinutes().toString().padStart(2, "0")}
                             </span>
-                            {booking.customerName && (
+                            {booking.customerInfo?.name && (
                               <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                                {booking.customerName}
+                                {booking.customerInfo.name}
                               </div>
                             )}
                           </div>

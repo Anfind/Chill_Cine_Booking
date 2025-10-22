@@ -2,19 +2,46 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Clock, Film, ChevronLeft, ChevronRight, Check } from "lucide-react"
+import { CalendarIcon, Clock, Film, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { vi } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import type { Room } from "@/lib/data"
-import { comboPackages, menuItems } from "@/lib/data"
+import { fetchComboPackages, fetchMenuItems, createBooking } from "@/lib/api-client"
+import { toast } from "@/hooks/use-toast"
+
+// MongoDB Room type
+interface Room {
+  _id: string
+  name: string
+  code: string
+  capacity: number
+  pricePerHour: number
+  images: string[]
+  amenities: string[]
+  description?: string
+}
+
+interface ComboPackage {
+  _id: string
+  name: string
+  description: string
+  price: number
+}
+
+interface MenuItem {
+  _id: string
+  name: string
+  description?: string
+  price: number
+  category: string
+}
 
 interface BookingFormProps {
   room: Room
@@ -27,6 +54,7 @@ interface BookingFormProps {
     date: Date
     startTime: Date
     endTime: Date
+    bookingId?: string
   }) => void
   onCancel: () => void
 }
@@ -55,8 +83,46 @@ export function BookingForm({
   const [selectedCombo, setSelectedCombo] = useState<string | null>(null)
   const [selectedMenuItems, setSelectedMenuItems] = useState<Record<string, number>>({})
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const roomImages = room.images || [room.image]
+  // MongoDB data states
+  const [comboPackages, setComboPackages] = useState<ComboPackage[]>([])
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [isLoadingData, setIsLoadingData] = useState(true)
+
+  const roomImages = room.images || []
+
+  // Load combos and menu items on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoadingData(true)
+      try {
+        const [combosRes, menuRes] = await Promise.all([
+          fetchComboPackages(),
+          fetchMenuItems()
+        ])
+        
+        if (combosRes.success && combosRes.data) {
+          setComboPackages(combosRes.data)
+        }
+        
+        if (menuRes.success && menuRes.data) {
+          setMenuItems(menuRes.data)
+        }
+      } catch (error) {
+        console.error('Error loading combos and menu:', error)
+        toast({
+          title: "Lỗi",
+          description: "Không thể tải dữ liệu combo và menu",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingData(false)
+      }
+    }
+
+    loadData()
+  }, [])
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % roomImages.length)
@@ -68,10 +134,10 @@ export function BookingForm({
 
   const calculateTotal = () => {
     if (selectedCombo) {
-      const combo = comboPackages.find((c) => c.id === selectedCombo)
+      const combo = comboPackages.find((c) => c._id === selectedCombo)
       if (combo) {
         const menuTotal = Object.entries(selectedMenuItems).reduce((sum, [itemId, quantity]) => {
-          const item = menuItems.find((m) => m.id === itemId)
+          const item = menuItems.find((m) => m._id === itemId)
           return sum + (item ? item.price * quantity : 0)
         }, 0)
         return combo.price + menuTotal
@@ -89,34 +155,125 @@ export function BookingForm({
 
     const roomTotal = Math.max(0, durationHours * room.pricePerHour)
     const menuTotal = Object.entries(selectedMenuItems).reduce((sum, [itemId, quantity]) => {
-      const item = menuItems.find((m) => m.id === itemId)
+      const item = menuItems.find((m) => m._id === itemId)
       return sum + (item ? item.price * quantity : 0)
     }, 0)
 
     return roomTotal + menuTotal
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!date || !customerName || !customerPhone) return
+    if (!date || !customerName || !customerPhone) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng điền đầy đủ thông tin",
+        variant: "destructive",
+      })
+      return
+    }
 
-    const [startHour, startMin] = startTime.split(":").map(Number)
-    const [endHour, endMin] = endTime.split(":").map(Number)
+    setIsSubmitting(true)
 
-    const startDateTime = new Date(date)
-    startDateTime.setHours(startHour, startMin, 0, 0)
+    try {
+      const [startHour, startMin] = startTime.split(":").map(Number)
+      const [endHour, endMin] = endTime.split(":").map(Number)
 
-    const endDateTime = new Date(date)
-    endDateTime.setHours(endHour, endMin, 0, 0)
+      const startDateTime = new Date(date)
+      startDateTime.setHours(startHour, startMin, 0, 0)
 
-    onSubmit({
-      customerName,
-      customerPhone,
-      date,
-      startTime: startDateTime,
-      endTime: endDateTime,
-    })
+      const endDateTime = new Date(date)
+      endDateTime.setHours(endHour, endMin, 0, 0)
+
+      // Validation: Không được đặt giờ quá khứ (phải cách hiện tại ít nhất 5 phút)
+      const now = new Date()
+      const minBookingTime = new Date(now.getTime() + 5 * 60 * 1000) // +5 phút
+      
+      if (startDateTime < minBookingTime) {
+        toast({
+          title: "Lỗi thời gian",
+          description: "Không thể đặt phòng cho giờ quá khứ. Vui lòng chọn giờ bắt đầu ít nhất 5 phút sau thời điểm hiện tại.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validation: endTime phải sau startTime
+      if (endDateTime <= startDateTime) {
+        toast({
+          title: "Lỗi thời gian",
+          description: "Giờ kết thúc phải sau giờ bắt đầu",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validation: Duration tối thiểu 1 giờ
+      const minDuration = 1 * 60 * 60 * 1000 // 1 giờ
+      if (endDateTime.getTime() - startDateTime.getTime() < minDuration) {
+        toast({
+          title: "Lỗi thời gian",
+          description: "Thời gian đặt phòng tối thiểu là 1 giờ",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Prepare booking data
+      const bookingData = {
+        roomId: room._id,
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        customerInfo: {
+          name: customerName,
+          phone: customerPhone,
+        },
+        services: {
+          comboPackageId: selectedCombo || undefined,
+          menuItems: Object.entries(selectedMenuItems).map(([itemId, quantity]) => ({
+            menuItemId: itemId,
+            quantity,
+          })),
+        },
+        totalPrice: calculateTotal(),
+        status: 'pending',
+      }
+
+      // Create booking via API
+      const response = await createBooking(bookingData)
+
+      if (response.success && response.data) {
+        toast({
+          title: "Thành công",
+          description: `Đặt phòng thành công! Mã đặt phòng: ${response.data.bookingCode}`,
+        })
+
+        // Pass booking ID to parent
+        onSubmit({
+          customerName,
+          customerPhone,
+          date,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          bookingId: response.data._id,
+        })
+      } else {
+        throw new Error(response.error || 'Không thể tạo booking')
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error)
+      toast({
+        title: "Lỗi",
+        description: error instanceof Error ? error.message : "Không thể đặt phòng. Vui lòng thử lại.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const toggleMenuItem = (itemId: string) => {
@@ -154,6 +311,7 @@ export function BookingForm({
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-6 pt-6">
+          {/* Slideshow hình ảnh phòng */}
           <div className="space-y-3">
             <Label className="text-base font-semibold text-gray-800">Hình ảnh phòng</Label>
             <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 border-2 border-pink-200">
@@ -200,51 +358,38 @@ export function BookingForm({
             </div>
           </div>
 
-          {room.description && (
-            <div className="space-y-2 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border border-pink-200">
-              <Label className="text-base font-semibold text-gray-800">Mô tả phòng</Label>
-              <p className="text-sm text-gray-700 leading-relaxed">{room.description}</p>
-            </div>
-          )}
-
+          {/* Chọn gói combo */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold text-gray-800">Tiện ích phòng</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {room.amenities.map((amenity, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-pink-50 border border-pink-200">
-                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center">
-                    <Check className="h-3 w-3 text-white" />
-                  </div>
-                  <span className="text-sm text-gray-700">{amenity}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-4 border-t-2 border-pink-200">
             <Label className="text-base font-semibold text-gray-800">Chọn gói combo</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {comboPackages.map((combo) => (
-                <Button
-                  key={combo.id}
-                  type="button"
-                  variant={selectedCombo === combo.id ? "default" : "outline"}
-                  className={cn(
-                    "h-auto py-3 flex flex-col items-start gap-1",
-                    selectedCombo === combo.id
-                      ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white border-0"
-                      : "border-pink-200 hover:border-pink-400 hover:bg-pink-50",
-                  )}
-                  onClick={() => {
-                    setSelectedCombo(selectedCombo === combo.id ? null : combo.id)
-                  }}
-                >
-                  <span className="font-bold text-sm">{combo.name}</span>
-                  <span className="text-xs opacity-90">{combo.description}</span>
-                  <span className="font-bold text-base">{combo.price.toLocaleString("vi-VN")}đ</span>
-                </Button>
-              ))}
-            </div>
+            {isLoadingData ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-pink-500" />
+                <span className="ml-2 text-sm text-gray-600">Đang tải combo...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {comboPackages.map((combo) => (
+                  <Button
+                    key={combo._id}
+                    type="button"
+                    variant={selectedCombo === combo._id ? "default" : "outline"}
+                    className={cn(
+                      "h-auto py-3 flex flex-col items-start gap-1",
+                      selectedCombo === combo._id
+                        ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white border-0"
+                        : "border-pink-200 hover:border-pink-400 hover:bg-pink-50",
+                    )}
+                    onClick={() => {
+                      setSelectedCombo(selectedCombo === combo._id ? null : combo._id)
+                    }}
+                  >
+                    <span className="font-bold text-sm">{combo.name}</span>
+                    <span className="text-xs opacity-90">{combo.description}</span>
+                    <span className="font-bold text-base">{combo.price.toLocaleString("vi-VN")}đ</span>
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
 
           {!selectedCombo && (
@@ -290,6 +435,9 @@ export function BookingForm({
                       required
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Phải cách hiện tại ít nhất 5 phút
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -305,6 +453,9 @@ export function BookingForm({
                       required
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tối thiểu 1 giờ
+                  </p>
                 </div>
               </div>
             </>
@@ -312,57 +463,64 @@ export function BookingForm({
 
           <div className="space-y-3 pt-4 border-t-2 border-pink-200">
             <Label className="text-base font-semibold text-gray-800">Menu dịch vụ (tùy chọn)</Label>
-            <div className="space-y-2">
-              {menuItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border-2 transition-all",
-                    selectedMenuItems[item.id]
-                      ? "border-pink-400 bg-pink-50"
-                      : "border-pink-100 hover:border-pink-300 hover:bg-pink-50/50",
-                  )}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-gray-800">{item.name}</div>
-                    <div className="text-xs text-pink-600 font-semibold">{item.price.toLocaleString("vi-VN")}đ</div>
-                  </div>
-                  {selectedMenuItems[item.id] ? (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 border-pink-300 bg-transparent"
-                        onClick={() => updateMenuItemQuantity(item.id, -1)}
-                      >
-                        -
-                      </Button>
-                      <span className="w-6 text-center font-semibold text-pink-600">{selectedMenuItems[item.id]}</span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 border-pink-300 bg-transparent"
-                        onClick={() => updateMenuItemQuantity(item.id, 1)}
-                      >
-                        +
-                      </Button>
+            {isLoadingData ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-pink-500" />
+                <span className="ml-2 text-sm text-gray-600">Đang tải menu...</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {menuItems.map((item) => (
+                  <div
+                    key={item._id}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border-2 transition-all",
+                      selectedMenuItems[item._id]
+                        ? "border-pink-400 bg-pink-50"
+                        : "border-pink-100 hover:border-pink-300 hover:bg-pink-50/50",
+                    )}
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-sm text-gray-800">{item.name}</div>
+                      <div className="text-xs text-pink-600 font-semibold">{item.price.toLocaleString("vi-VN")}đ</div>
                     </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="border-pink-300 hover:bg-pink-100 bg-transparent"
-                      onClick={() => toggleMenuItem(item.id)}
-                    >
-                      Thêm
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
+                    {selectedMenuItems[item._id] ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 border-pink-300 bg-transparent"
+                          onClick={() => updateMenuItemQuantity(item._id, -1)}
+                        >
+                          -
+                        </Button>
+                        <span className="w-6 text-center font-semibold text-pink-600">{selectedMenuItems[item._id]}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 border-pink-300 bg-transparent"
+                          onClick={() => updateMenuItemQuantity(item._id, 1)}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-pink-300 hover:bg-pink-100 bg-transparent"
+                        onClick={() => toggleMenuItem(item._id)}
+                      >
+                        Thêm
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2 pt-4 border-t-2 border-pink-200">
@@ -404,15 +562,24 @@ export function BookingForm({
             type="button"
             variant="outline"
             onClick={onCancel}
+            disabled={isSubmitting}
             className="flex-1 bg-transparent border-pink-300 hover:bg-pink-50"
           >
             Hủy
           </Button>
           <Button
             type="submit"
-            className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-lg"
+            disabled={isSubmitting || isLoadingData}
+            className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-lg disabled:opacity-50"
           >
-            Tiếp tục thanh toán
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Đang xử lý...
+              </>
+            ) : (
+              'Tiếp tục thanh toán'
+            )}
           </Button>
         </CardFooter>
       </form>

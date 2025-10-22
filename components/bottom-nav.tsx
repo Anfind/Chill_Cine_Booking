@@ -33,11 +33,12 @@ export function BottomNav() {
       label: "Fanpage",
       href: "https://facebook.com/yourpage",
     },
-    {
-      icon: MapPin,
-      label: "Vị trí",
-      href: "/locations",
-    },
+    // Tạm thời ẩn "Vị trí" vì chưa có page /locations
+    // {
+    //   icon: MapPin,
+    //   label: "Vị trí",
+    //   href: "/locations",
+    // },
   ]
 
   return (

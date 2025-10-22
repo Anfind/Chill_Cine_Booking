@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useState, useEffect } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { MapPin, ChevronRight, ChevronLeft } from "lucide-react"
-import { cities, getBranchesByCity, type City, type Branch } from "@/lib/data"
+import { MapPin, ChevronRight, ChevronLeft, Loader2 } from "lucide-react"
+import { fetchCities, fetchBranches } from "@/lib/api-client"
 import Image from "next/image"
 
 interface LocationSelectorProps {
@@ -13,9 +13,69 @@ interface LocationSelectorProps {
   onLocationSelected: (branchId: string) => void
 }
 
+interface City {
+  _id: string
+  name: string
+  code: string
+  slug: string
+  isActive: boolean
+  displayOrder: number
+}
+
+interface Branch {
+  _id: string
+  name: string
+  slug: string
+  address: string
+  phone: string
+  cityId: any
+  images: string[]
+  isActive: boolean
+}
+
 export function LocationSelector({ open, onLocationSelected }: LocationSelectorProps) {
   const [step, setStep] = useState<"city" | "branch">("city")
   const [selectedCity, setSelectedCity] = useState<City | null>(null)
+  const [cities, setCities] = useState<City[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load cities on mount
+  useEffect(() => {
+    loadCities()
+  }, [])
+
+  // Load branches when city selected
+  useEffect(() => {
+    if (selectedCity) {
+      loadBranches(selectedCity._id)
+    }
+  }, [selectedCity])
+
+  const loadCities = async () => {
+    setLoading(true)
+    setError(null)
+    const response = await fetchCities()
+    if (response.success && response.data) {
+      setCities(response.data)
+    } else {
+      setError(response.error || 'Không thể tải danh sách tỉnh thành')
+    }
+    setLoading(false)
+  }
+
+  const loadBranches = async (cityId: string) => {
+    setLoading(true)
+    setError(null)
+    const response = await fetchBranches(cityId)
+    if (response.success && response.data) {
+      setBranches(response.data)
+    } else {
+      setError(response.error || 'Không thể tải danh sách chi nhánh')
+    }
+    setLoading(false)
+  }
 
   const handleCitySelect = (city: City) => {
     setSelectedCity(city)
@@ -23,15 +83,14 @@ export function LocationSelector({ open, onLocationSelected }: LocationSelectorP
   }
 
   const handleBranchSelect = (branch: Branch) => {
-    onLocationSelected(branch.id)
+    onLocationSelected(branch._id)
   }
 
   const handleBack = () => {
     setStep("city")
     setSelectedCity(null)
+    setBranches([])
   }
-
-  const cityBranches = selectedCity ? getBranchesByCity(selectedCity.id) : []
 
   return (
     <Dialog open={open} modal>
@@ -54,17 +113,28 @@ export function LocationSelector({ open, onLocationSelected }: LocationSelectorP
           <DialogTitle className="text-lg sm:text-xl font-bold text-center">
             {step === "city" ? "Chọn tỉnh thành" : selectedCity?.name}
           </DialogTitle>
-          {step === "branch" && (
-            <p className="text-xs sm:text-sm text-muted-foreground text-center mt-1">Chọn chi nhánh của bạn</p>
-          )}
+          <DialogDescription className="text-xs sm:text-sm text-muted-foreground text-center">
+            {step === "city" ? "Chọn tỉnh/thành phố để xem các chi nhánh" : "Chọn chi nhánh của bạn"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 space-y-2 sm:space-y-3">
-          {step === "city" ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-red-500 mb-2">{error}</p>
+              <Button variant="outline" size="sm" onClick={step === "city" ? loadCities : () => loadBranches(selectedCity!._id)}>
+                Thử lại
+              </Button>
+            </div>
+          ) : step === "city" ? (
             <>
               {cities.map((city) => (
                 <Card
-                  key={city.id}
+                  key={city._id}
                   className="p-3 sm:p-4 cursor-pointer hover:shadow-md hover:border-primary/50 transition-all duration-200 active:scale-[0.98] hover:bg-primary/5"
                   onClick={() => handleCitySelect(city)}
                 >
@@ -82,15 +152,15 @@ export function LocationSelector({ open, onLocationSelected }: LocationSelectorP
             </>
           ) : (
             <>
-              {cityBranches.map((branch) => (
+              {branches.map((branch) => (
                 <Card
-                  key={branch.id}
+                  key={branch._id}
                   className="overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-200 active:scale-[0.98] hover:bg-primary/5"
                   onClick={() => handleBranchSelect(branch)}
                 >
                   <div className="flex gap-2 sm:gap-3 p-2.5 sm:p-3">
                     <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-border">
-                      <Image src={branch.image || "/placeholder.svg"} alt={branch.name} fill className="object-cover" />
+                      <Image src={branch.images[0] || "/placeholder.svg"} alt={branch.name} fill className="object-cover" />
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <h3 className="font-semibold text-sm sm:text-base mb-0.5 sm:mb-1">{branch.name}</h3>

@@ -1,5 +1,4 @@
 import { RoomsClient } from "./rooms-client"
-import { branches } from "@/lib/data"
 
 export default async function RoomsPage({ params }: { params: Promise<{ branchId: string }> }) {
   const { branchId } = await params
@@ -9,10 +8,30 @@ export default async function RoomsPage({ params }: { params: Promise<{ branchId
 
 export async function generateMetadata({ params }: { params: Promise<{ branchId: string }> }) {
   const { branchId } = await params
-  const branch = branches.find((b) => b.id === branchId)
+  
+  try {
+    // Fetch branch from API for metadata
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const res = await fetch(`${baseUrl}/api/branches/${branchId}`, {
+      cache: 'no-store'
+    })
+    const data = await res.json()
+    
+    if (data.success && data.data) {
+      const branch = data.data
+      const cityName = typeof branch.cityId === 'object' ? branch.cityId.name : ''
+      
+      return {
+        title: `${branch.name} - Danh sách phòng`,
+        description: `Xem và đặt phòng tại ${branch.name}, ${branch.address}${cityName ? ` - ${cityName}` : ''}`,
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching branch for metadata:', error)
+  }
 
   return {
-    title: branch ? `${branch.name} - Danh sách phòng` : "Không tìm thấy chi nhánh",
-    description: branch ? `Xem và đặt phòng tại ${branch.name}, ${branch.address}` : "",
+    title: "Danh sách phòng",
+    description: "Xem và đặt phòng",
   }
 }

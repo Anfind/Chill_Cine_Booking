@@ -6,8 +6,18 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, Check, Film } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Room } from "@/lib/data"
-import { menuItems } from "@/lib/data"
+
+// MongoDB Room type
+interface Room {
+  _id: string
+  name: string
+  code: string
+  capacity: number
+  pricePerHour: number
+  images: string[]
+  amenities: string[]
+  description?: string
+}
 
 interface RoomDetailsPanelProps {
   room: Room
@@ -15,7 +25,7 @@ interface RoomDetailsPanelProps {
 
 export function RoomDetailsPanel({ room }: RoomDetailsPanelProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const roomImages = room.images || [room.image]
+  const roomImages = room.images || []
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % roomImages.length)
@@ -104,22 +114,6 @@ export function RoomDetailsPanel({ room }: RoomDetailsPanelProps) {
                     <Check className="h-2.5 w-2.5 text-white" />
                   </div>
                   <span className="text-xs text-gray-700">{amenity}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Menu */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-800 mb-2">Menu dịch vụ</h3>
-            <div className="space-y-2">
-              {menuItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between p-2 rounded-lg border border-pink-100 bg-pink-50/50"
-                >
-                  <span className="text-xs text-gray-700">{item.name}</span>
-                  <span className="text-xs font-semibold text-pink-600">{item.price.toLocaleString("vi-VN")}đ</span>
                 </div>
               ))}
             </div>

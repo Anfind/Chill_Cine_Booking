@@ -1,24 +1,83 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Users, ChevronLeft, Film, Tv, Gamepad2, Armchair } from "lucide-react"
-import { branches, getRoomsByBranch } from "@/lib/data"
+import { MapPin, Users, ChevronLeft, Film, Tv, Gamepad2, Armchair, Loader2 } from "lucide-react"
+import { fetchBranchById, fetchRooms } from "@/lib/api-client"
 import Image from "next/image"
+
+interface Branch {
+  _id: string
+  name: string
+  address: string
+  phone: string
+  images: string[]
+}
+
+interface Room {
+  _id: string
+  code: string
+  name: string
+  capacity: number
+  pricePerHour: number
+  images: string[]
+  amenities: string[]
+  status: string
+  roomTypeId: {
+    name: string
+    color: string
+  }
+}
 
 export function RoomsClient({ branchId }: { branchId: string }) {
   const router = useRouter()
+  const [branch, setBranch] = useState<Branch | null>(null)
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const branch = branches.find((b) => b.id === branchId)
-  const rooms = getRoomsByBranch(branchId)
+  useEffect(() => {
+    loadData()
+  }, [branchId])
 
-  if (!branch) {
+  const loadData = async () => {
+    setLoading(true)
+    setError(null)
+
+    // Load branch info
+    const branchResponse = await fetchBranchById(branchId)
+    if (!branchResponse.success) {
+      setError(branchResponse.error || 'Không tìm thấy chi nhánh')
+      setLoading(false)
+      return
+    }
+    setBranch(branchResponse.data)
+
+    // Load rooms
+    const roomsResponse = await fetchRooms(branchId, 'available')
+    if (roomsResponse.success && roomsResponse.data) {
+      setRooms(roomsResponse.data)
+    }
+
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (error || !branch) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-xl sm:text-2xl font-bold mb-4">Không tìm thấy chi nhánh</h1>
+          <h1 className="text-xl sm:text-2xl font-bold mb-4">{error || 'Không tìm thấy chi nhánh'}</h1>
           <Button onClick={() => router.push("/")} size="lg">
             Quay lại trang chủ
           </Button>
@@ -92,11 +151,11 @@ export function RoomsClient({ branchId }: { branchId: string }) {
         ) : (
           rooms.map((room) => (
             <Card
-              key={room.id}
+              key={room._id}
               className="overflow-hidden hover:shadow-xl transition-all duration-200 border-2 border-pink-100 hover:border-pink-300"
             >
               <div className="relative h-44 sm:h-52 w-full">
-                <Image src={room.image || "/placeholder.svg"} alt={room.name} fill className="object-cover" />
+                <Image src={room.images[0] || "/placeholder.svg"} alt={room.name} fill className="object-cover" />
                 <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
                   <Badge className="bg-pink-500 text-white border-0 shadow-lg text-xs">
                     <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
@@ -106,7 +165,7 @@ export function RoomsClient({ branchId }: { branchId: string }) {
                 <div className="absolute top-2 sm:top-3 left-2 sm:left-3">
                   <Badge className="bg-purple-500 text-white border-0 shadow-lg text-xs">
                     <Film className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
-                    Cinema
+                    {room.roomTypeId?.name || 'Cinema'}
                   </Badge>
                 </div>
               </div>
@@ -144,7 +203,7 @@ export function RoomsClient({ branchId }: { branchId: string }) {
               <CardFooter className="pt-0 px-4 sm:px-6 pb-4 sm:pb-6">
                 <Button
                   className="w-full h-10 sm:h-11 text-sm sm:text-base font-semibold bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-lg"
-                  onClick={() => router.push(`/booking/${room.id}`)}
+                  onClick={() => router.push(`/booking/${room._id}`)}
                 >
                   Đặt phòng ngay 🎬
                 </Button>
