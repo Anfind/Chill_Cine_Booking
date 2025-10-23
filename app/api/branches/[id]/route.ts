@@ -154,7 +154,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       success: true,
       message: 'Branch deleted successfully',
     })
-    })
   } catch (error) {
     console.error('Error deleting branch:', error)
     return NextResponse.json(
