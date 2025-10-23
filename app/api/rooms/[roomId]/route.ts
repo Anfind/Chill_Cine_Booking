@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { Room, Branch, RoomType } from '@/lib/models'
+import { cache, CacheTags, withCache, CacheTTL } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/rooms/[roomId]
  * Lấy thông tin chi tiết 1 phòng
+ * 
+ * Cached for 15 minutes
  */
 export async function GET(
   request: Request,
@@ -16,10 +19,22 @@ export async function GET(
     await connectDB()
 
     const { roomId } = await params
-    const room = await Room.findById(roomId)
-      .populate('branchId', 'name address phone')
-      .populate('roomTypeId', 'name slug color')
-      .lean()
+
+    // Cache key based on room ID
+    const cacheKey = `room:${roomId}`
+
+    const room = await withCache(
+      cacheKey,
+      async () => {
+        return await Room.findById(roomId)
+          .populate('branchId', 'name address phone')
+          .populate('roomTypeId', 'name slug color')
+          .select('_id name code capacity pricePerHour status branchId roomTypeId images amenities description isActive')
+          .lean()
+      },
+      CacheTTL.FIFTEEN_MINUTES,
+      [CacheTags.ROOMS]
+    )
 
     if (!room) {
       return NextResponse.json(
@@ -28,10 +43,17 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({
-      success: true,
-      data: room,
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        data: room,
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=1800',
+        },
+      }
+    )
   } catch (error) {
     console.error('Error fetching room:', error)
     return NextResponse.json(
@@ -118,6 +140,9 @@ export async function PUT(
       .populate('roomTypeId', 'name slug color')
       .lean()
 
+    // Invalidate cache
+    cache.clearByTag(CacheTags.ROOMS)
+
     return NextResponse.json({
       success: true,
       data: updatedRoom,
@@ -162,6 +187,9 @@ export async function DELETE(
       isActive: false,
       status: 'unavailable',
     })
+
+    // Invalidate cache
+    cache.clearByTag(CacheTags.ROOMS)
 
     return NextResponse.json({
       success: true,

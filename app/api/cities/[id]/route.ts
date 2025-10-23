@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { City, Branch } from '@/lib/models'
+import { cache, CacheTags } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -103,6 +104,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     await existingCity.save()
 
+    // Invalidate cache
+    cache.clearByTag(CacheTags.CITIES)
+
     return NextResponse.json({
       success: true,
       data: existingCity,
@@ -168,6 +172,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
 
     await City.findByIdAndDelete(id)
+
+    // Invalidate cache
+    cache.clearByTag(CacheTags.CITIES)
 
     return NextResponse.json({
       success: true,
