@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { Room, Branch, RoomType } from '@/lib/models'
+import { withCache, cache, CacheTTL, CacheTags } from '@/lib/cache'
 
-export const dynamic = 'force-dynamic'
+// Cache for 15 minutes
+export const revalidate = 900
 
 /**
  * GET /api/rooms?branchId=xxx&status=available
  * Lấy danh sách rooms theo branchId và status
+ * 
+ * Cached for 15 minutes
  */
 export async function GET(request: Request) {
   try {
@@ -16,28 +20,46 @@ export async function GET(request: Request) {
     const branchId = searchParams.get('branchId')
     const status = searchParams.get('status') || 'available'
 
-    let query: any = { isActive: true }
-    
-    if (branchId) {
-      query.branchId = branchId
-    }
-    
-    if (status) {
-      query.status = status
-    }
+    // Cache key based on query params
+    const cacheKey = `rooms:${branchId || 'all'}:${status}`
 
-    const rooms = await Room.find(query)
-      .populate('branchId', 'name address phone')
-      .populate('roomTypeId', 'name slug color')
-      .sort({ name: 1 })
-      .lean()
+    const rooms = await withCache(
+      cacheKey,
+      async () => {
+        let query: any = { isActive: true }
+        
+        if (branchId) {
+          query.branchId = branchId
+        }
+        
+        if (status) {
+          query.status = status
+        }
 
-    return NextResponse.json({
-      success: true,
-      data: rooms,
-      count: rooms.length,
-      filters: { branchId, status },
-    })
+        return await Room.find(query)
+          .populate('branchId', 'name address phone')
+          .populate('roomTypeId', 'name slug color')
+          .select('_id name code capacity pricePerHour status branchId roomTypeId images isActive')
+          .sort({ name: 1 })
+          .lean()
+      },
+      CacheTTL.FIFTEEN_MINUTES,
+      [CacheTags.ROOMS]
+    )
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: rooms,
+        count: rooms.length,
+        filters: { branchId, status },
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=1800',
+        },
+      }
+    )
   } catch (error) {
     console.error('Error fetching rooms:', error)
     return NextResponse.json(
@@ -110,6 +132,9 @@ export async function POST(request: Request) {
       .populate('branchId', 'name address phone')
       .populate('roomTypeId', 'name slug color')
       .lean()
+
+    // Invalidate cache
+    cache.clearByTag(CacheTags.ROOMS)
 
     return NextResponse.json(
       {
