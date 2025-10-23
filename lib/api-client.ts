@@ -4,7 +4,10 @@
  */
 
 // Use relative URLs for API calls - works with ngrok and any domain
-const API_BASE_URL = typeof window !== 'undefined' ? '' : 'http://localhost:3000'
+// For server-side, use NEXT_PUBLIC_APP_URL from env with fallback to production domain
+const API_BASE_URL = typeof window !== 'undefined' 
+  ? '' // Browser: use relative URLs
+  : (process.env.NEXT_PUBLIC_APP_URL || 'https://chillcine.com') // Server: use env or production domain
 
 export interface ApiResponse<T> {
   success: boolean
