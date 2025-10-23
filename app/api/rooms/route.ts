@@ -39,7 +39,7 @@ export async function GET(request: Request) {
         return await Room.find(query)
           .populate('branchId', 'name address phone')
           .populate('roomTypeId', 'name slug color')
-          .select('_id name code capacity pricePerHour status branchId roomTypeId images isActive')
+          .select('_id name code capacity pricePerHour status branchId roomTypeId images amenities isActive')
           .sort({ name: 1 })
           .lean()
       },
