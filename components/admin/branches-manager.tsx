@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,12 @@ interface Branch {
   address: string
   phone?: string
   slug: string
+  images?: string[]
+  amenities?: string[]
+  openingHours?: {
+    open: string
+    close: string
+  }
 }
 
 export function BranchesManager() {
@@ -45,6 +52,10 @@ export function BranchesManager() {
     cityId: "",
     address: "",
     phone: "",
+    images: "",
+    amenities: "",
+    openTime: "00:00",
+    closeTime: "23:59",
   })
 
   // Fetch branches and cities on mount
@@ -85,7 +96,16 @@ export function BranchesManager() {
 
   const handleAdd = () => {
     setEditingBranch(null)
-    setFormData({ name: "", cityId: "", address: "", phone: "" })
+    setFormData({ 
+      name: "", 
+      cityId: "", 
+      address: "", 
+      phone: "",
+      images: "",
+      amenities: "",
+      openTime: "00:00",
+      closeTime: "23:59",
+    })
     setIsDialogOpen(true)
   }
 
@@ -96,6 +116,10 @@ export function BranchesManager() {
       cityId: typeof branch.cityId === 'object' ? branch.cityId._id : branch.cityId,
       address: branch.address,
       phone: branch.phone || "",
+      images: branch.images?.join("\n") || "",
+      amenities: branch.amenities?.join(", ") || "",
+      openTime: branch.openingHours?.open || "00:00",
+      closeTime: branch.openingHours?.close || "23:59",
     })
     setIsDialogOpen(true)
   }
@@ -129,20 +153,45 @@ export function BranchesManager() {
     setIsLoading(true)
 
     try {
+      // Parse amenities (comma separated)
+      const amenitiesArray = formData.amenities
+        .split(",")
+        .map((a) => a.trim())
+        .filter((a) => a)
+
+      // Parse images (newline separated)
+      const imagesArray = formData.images
+        .split("\n")
+        .map((img) => img.trim())
+        .filter((img) => img)
+
+      const payload = {
+        name: formData.name,
+        cityId: formData.cityId,
+        address: formData.address,
+        phone: formData.phone,
+        openingHours: {
+          open: formData.openTime,
+          close: formData.closeTime,
+        },
+        amenities: amenitiesArray,
+        images: imagesArray,
+      }
+
       let res
       if (editingBranch) {
         // Update existing branch
         res = await fetch(`/api/branches/${editingBranch._id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         })
       } else {
         // Add new branch
         res = await fetch('/api/branches', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         })
       }
 
@@ -288,6 +337,53 @@ export function BranchesManager() {
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   disabled={isLoading}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="openTime">Giờ mở cửa</Label>
+                  <Input
+                    id="openTime"
+                    type="time"
+                    value={formData.openTime}
+                    onChange={(e) => setFormData({ ...formData, openTime: e.target.value })}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="closeTime">Giờ đóng cửa</Label>
+                  <Input
+                    id="closeTime"
+                    type="time"
+                    value={formData.closeTime}
+                    onChange={(e) => setFormData({ ...formData, closeTime: e.target.value })}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amenities">Tiện ích (phân cách bằng dấu phẩy)</Label>
+                <Textarea
+                  id="amenities"
+                  placeholder="WiFi miễn phí, Bãi đỗ xe, Thang máy, Điều hòa"
+                  value={formData.amenities}
+                  onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
+                  rows={2}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="images">Hình ảnh (mỗi URL một dòng)</Label>
+                <Textarea
+                  id="images"
+                  placeholder="https://images.unsplash.com/photo-1.jpg&#10;https://images.unsplash.com/photo-2.jpg&#10;https://images.unsplash.com/photo-3.jpg"
+                  value={formData.images}
+                  onChange={(e) => setFormData({ ...formData, images: e.target.value })}
+                  rows={4}
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nhập mỗi URL hình ảnh trên một dòng. Ảnh đầu tiên sẽ được dùng làm thumbnail.
+                </p>
               </div>
             </div>
             <DialogFooter>
