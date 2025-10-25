@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Booking from '@/lib/models/Booking'
+import { validateCronSecret } from '@/lib/auth/admin'
+import { errorResponse, successResponse } from '@/lib/api/response'
 
 /**
  * POST /api/bookings/cleanup
@@ -29,37 +31,11 @@ import Booking from '@/lib/models/Booking'
  * Security: Chỉ chạy từ internal (cron job hoặc có secret key)
  */
 export async function POST(request: Request) {
+  // ✅ SECURITY: Validate CRON_SECRET from Authorization header
+  const authError = await validateCronSecret(request)
+  if (authError) return authError
+
   try {
-    // Security: Check authorization
-    // Allow if:
-    // 1. Called from Vercel Cron (has VERCEL_CRON_SECRET header)
-    // 2. Has valid Bearer token with CRON_SECRET
-    const authHeader = request.headers.get('authorization')
-    const vercelCronSecret = request.headers.get('x-vercel-cron-signature')
-    const cronSecret = process.env.CRON_SECRET || 'default-cron-secret-change-me'
-    
-    const isVercelCron = !!vercelCronSecret && process.env.VERCEL === '1'
-    const isValidBearerToken = authHeader === `Bearer ${cronSecret}`
-    
-    if (!isVercelCron && !isValidBearerToken) {
-      console.warn('⚠️  Unauthorized cleanup attempt', {
-        hasVercelCronHeader: !!vercelCronSecret,
-        hasAuthHeader: !!authHeader,
-        isVercel: process.env.VERCEL === '1'
-      })
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Unauthorized' 
-        },
-        { status: 401 }
-      )
-    }
-
-    console.log('✅ Authorized cleanup request', {
-      source: isVercelCron ? 'Vercel Cron' : 'Bearer Token'
-    })
-
     await connectDB()
 
     // Calculate cutoff time: 10 minutes ago from booking creation
@@ -127,24 +103,14 @@ export async function POST(request: Request) {
 
     console.log(`✅ Successfully cancelled ${cancelledBookings.length} expired booking(s)`)
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       cancelledCount: cancelledBookings.length,
       bookings: cancelledBookings,
       timestamp: now.toISOString(),
-    })
+    }, `Successfully cancelled ${cancelledBookings.length} expired booking(s)`)
 
   } catch (error) {
-    console.error('❌ Error during booking cleanup:', error)
-    
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to cleanup expired bookings',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
 
@@ -154,21 +120,11 @@ export async function POST(request: Request) {
  * Preview which bookings would be cancelled without actually cancelling them
  */
 export async function GET(request: Request) {
-  try {
-    // Security: Check authorization header
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET || 'default-cron-secret-change-me'
-    
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Unauthorized' 
-        },
-        { status: 401 }
-      )
-    }
+  // ✅ SECURITY: Validate CRON_SECRET from Authorization header
+  const authError = await validateCronSecret(request)
+  if (authError) return authError
 
+  try {
     await connectDB()
 
     // Calculate cutoff time: 10 minutes ago
@@ -199,25 +155,15 @@ export async function GET(request: Request) {
       }
     })
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       preview: true,
       count: expiredBookings.length,
       bookings: preview,
       cutoffTime: cutoffTime.toISOString(),
       currentTime: now.toISOString(),
-    })
+    }, `Preview: ${expiredBookings.length} booking(s) would be cancelled`)
 
   } catch (error) {
-    console.error('❌ Error previewing cleanup:', error)
-    
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to preview cleanup',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }

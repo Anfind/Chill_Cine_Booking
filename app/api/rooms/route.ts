@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { Room, Branch, RoomType } from '@/lib/models'
 import { withCache, cache, CacheTTL, CacheTags } from '@/lib/cache'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse } from '@/lib/api/response'
 
 // Cache for 15 minutes
 export const revalidate = 900
@@ -78,6 +80,10 @@ export async function GET(request: Request) {
  * Tạo room mới
  */
 export async function POST(request: Request) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const body = await request.json()
@@ -136,23 +142,8 @@ export async function POST(request: Request) {
     // Invalidate cache
     cache.clearByTag(CacheTags.ROOMS)
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: populatedRoom,
-        message: 'Room created successfully',
-      },
-      { status: 201 }
-    )
+    return successResponse(populatedRoom, 'Room created successfully', 201)
   } catch (error) {
-    console.error('Error creating room:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create room',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }

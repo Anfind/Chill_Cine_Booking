@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { Room, Branch, RoomType } from '@/lib/models'
 import { cache, CacheTags, withCache, CacheTTL } from '@/lib/cache'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse, notFoundResponse } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,6 +77,10 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ roomId: string }> }
 ) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { roomId } = await params
@@ -114,10 +120,7 @@ export async function PUT(
     // Check if room exists
     const existingRoom = await Room.findById(roomId)
     if (!existingRoom) {
-      return NextResponse.json(
-        { success: false, error: 'Room not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Room not found')
     }
 
     // Update room
@@ -143,21 +146,9 @@ export async function PUT(
     // Invalidate cache
     cache.clearByTag(CacheTags.ROOMS)
 
-    return NextResponse.json({
-      success: true,
-      data: updatedRoom,
-      message: 'Room updated successfully',
-    })
+    return successResponse(updatedRoom, 'Room updated successfully')
   } catch (error) {
-    console.error('Error updating room:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to update room',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
 
@@ -169,6 +160,10 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ roomId: string }> }
 ) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
 
@@ -176,10 +171,7 @@ export async function DELETE(
     // Check if room exists
     const existingRoom = await Room.findById(roomId)
     if (!existingRoom) {
-      return NextResponse.json(
-        { success: false, error: 'Room not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Room not found')
     }
 
     // Soft delete - set isActive to false
@@ -191,19 +183,8 @@ export async function DELETE(
     // Invalidate cache
     cache.clearByTag(CacheTags.ROOMS)
 
-    return NextResponse.json({
-      success: true,
-      message: 'Room deleted successfully',
-    })
+    return successResponse(null, 'Room deleted successfully')
   } catch (error) {
-    console.error('Error deleting room:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to delete room',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }

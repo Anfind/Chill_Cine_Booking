@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { City } from '@/lib/models'
 import { withCache, cache, CacheTTL, CacheTags } from '@/lib/cache'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse } from '@/lib/api/response'
 
 // Cache for 1 hour (cities don't change often)
 export const revalidate = 3600
@@ -64,39 +66,32 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/cities
- * Tạo city mới
+ * Tạo city mới (ADMIN ONLY)
  */
 export async function POST(request: Request) {
   try {
+    // 1. Check admin authentication
+    const adminCheck = await requireAdmin()
+    if (adminCheck) return adminCheck
+
+    // 2. Connect to database
     await connectDB()
 
     const body = await request.json()
     const { code, name, slug, isActive, displayOrder } = body
 
-    // Validation
+    // 3. Validation
     if (!code || !name) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Code và Name là bắt buộc',
-        },
-        { status: 400 }
-      )
+      return errorResponse(new Error('Code và Name là bắt buộc'), 400)
     }
 
-    // Check duplicate code
+    // 4. Check duplicate code
     const existingCity = await City.findOne({ code: code.toLowerCase() })
     if (existingCity) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Mã tỉnh thành đã tồn tại',
-        },
-        { status: 400 }
-      )
+      return errorResponse(new Error('Mã tỉnh thành đã tồn tại'), 409)
     }
 
-    // Auto-generate slug if not provided
+    // 5. Auto-generate slug if not provided
     const citySlug = slug || name.toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
@@ -106,6 +101,7 @@ export async function POST(request: Request) {
       .replace(/-+/g, '-')
       .trim()
 
+    // 6. Create city
     const city = await City.create({
       code: code.toLowerCase(),
       name,
@@ -114,35 +110,13 @@ export async function POST(request: Request) {
       displayOrder: displayOrder || 0,
     })
 
-    // Invalidate cache
+    // 7. Invalidate cache
     cache.clearByTag(CacheTags.CITIES)
 
-    return NextResponse.json({
-      success: true,
-      data: city,
-      message: 'Tạo tỉnh thành thành công',
-    })
+    // 8. Return success response
+    return successResponse(city, 'Tạo tỉnh thành thành công', 201)
   } catch (error) {
-    console.error('Error creating city:', error)
-    
-    // Handle duplicate slug error
-    if (error instanceof Error && error.message.includes('duplicate key')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Slug hoặc Code đã tồn tại',
-        },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Lỗi khi tạo tỉnh thành',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
+

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { ComboPackage } from '@/lib/models'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse, notFoundResponse } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +52,10 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ comboId: string }> }
 ) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { comboId } = await params
@@ -69,10 +75,7 @@ export async function PUT(
     // Check if combo exists
     const existingCombo = await ComboPackage.findById(comboId)
     if (!existingCombo) {
-      return NextResponse.json(
-        { success: false, error: 'Combo not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Combo not found')
     }
 
     // Check if code is taken by another combo
@@ -105,21 +108,9 @@ export async function PUT(
       { new: true }
     ).lean()
 
-    return NextResponse.json({
-      success: true,
-      data: updatedCombo,
-      message: 'Combo updated successfully',
-    })
+    return successResponse(updatedCombo, 'Combo updated successfully')
   } catch (error) {
-    console.error('Error updating combo:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to update combo',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
 
@@ -131,6 +122,10 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ comboId: string }> }
 ) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { comboId } = await params
@@ -138,10 +133,7 @@ export async function DELETE(
     // Check if combo exists
     const existingCombo = await ComboPackage.findById(comboId)
     if (!existingCombo) {
-      return NextResponse.json(
-        { success: false, error: 'Combo not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Combo not found')
     }
 
     // Soft delete
@@ -149,19 +141,9 @@ export async function DELETE(
       isActive: false,
     })
 
-    return NextResponse.json({
-      success: true,
-      message: 'Combo deleted successfully',
-    })
+    return successResponse(null, 'Combo deleted successfully')
   } catch (error) {
-    console.error('Error deleting combo:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to delete combo',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
+

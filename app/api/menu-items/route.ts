@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { MenuItem } from '@/lib/models'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,6 +51,10 @@ export async function GET(request: Request) {
  * Tạo menu item mới
  */
 export async function POST(request: Request) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const body = await request.json()
@@ -83,23 +89,9 @@ export async function POST(request: Request) {
       isAvailable: body.isAvailable !== undefined ? body.isAvailable : true,
     })
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: menuItem,
-        message: 'Menu item created successfully',
-      },
-      { status: 201 }
-    )
+    return successResponse(menuItem, 'Menu item created successfully', 201)
   } catch (error) {
-    console.error('Error creating menu item:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create menu item',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
+

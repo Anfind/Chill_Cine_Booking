@@ -5,15 +5,17 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CalendarIcon, Minus, Plus, Info, X, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { vi } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import { fetchComboPackages, fetchRooms, createBooking } from "@/lib/api-client"
+import { fetchComboPackages, fetchRooms, fetchMenuItems, createBooking } from "@/lib/api-client"
 import { toast } from "sonner"
 
 interface Room {
@@ -40,6 +42,13 @@ interface ComboPackage {
   description: string
   price: number
   duration: number
+}
+
+interface MenuItem {
+  _id: string
+  name: string
+  price: number
+  category: string
 }
 
 interface BookingFormV2Props {
@@ -71,25 +80,30 @@ export function BookingFormV2({
   const [startHour, setStartHour] = useState(selectedStartTime?.getHours() || 14)
   const [startMinute, setStartMinute] = useState(selectedStartTime?.getMinutes() || 0)
   const [additionalHours, setAdditionalHours] = useState(0)
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [selectedMenuItems, setSelectedMenuItems] = useState<Record<string, number>>({})
 
   // Step 2: Customer info
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
   const [customerEmail, setCustomerEmail] = useState("")
   const [customerCCCD, setCustomerCCCD] = useState("")
+  const [acceptedRules, setAcceptedRules] = useState(false)
+  const [showRulesDialog, setShowRulesDialog] = useState(false)
 
   // Loading states
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Load rooms and combos
+  // Load rooms, combos and menu items
   useEffect(() => {
     const loadData = async () => {
       setIsLoadingData(true)
       try {
-        const [roomsRes, combosRes] = await Promise.all([
+        const [roomsRes, combosRes, menuRes] = await Promise.all([
           fetchRooms(initialRoom.branchId._id, 'available'),
           fetchComboPackages(),
+          fetchMenuItems(),
         ])
 
         if (roomsRes.success && roomsRes.data) {
@@ -101,6 +115,9 @@ export function BookingFormV2({
           if (combosRes.data.length > 0) {
             setSelectedCombo(combosRes.data[0]._id)
           }
+        }
+        if (menuRes.success && menuRes.data) {
+          setMenuItems(menuRes.data)
         }
       } catch (error) {
         console.error('Error loading data:', error)
@@ -140,7 +157,14 @@ export function BookingFormV2({
 
     // Base combo price + additional hours price
     const additionalPrice = additionalHours * room.pricePerHour
-    return combo.price + additionalPrice
+    
+    // Menu items price
+    const menuPrice = Object.entries(selectedMenuItems).reduce((sum, [itemId, quantity]) => {
+      const item = menuItems.find(m => m._id === itemId)
+      return sum + (item ? item.price * quantity : 0)
+    }, 0)
+    
+    return combo.price + additionalPrice + menuPrice
   }
 
   const totalPrice = calculateTotalPrice()
@@ -151,6 +175,32 @@ export function BookingFormV2({
     if (newRoom) {
       setRoom(newRoom)
     }
+  }
+
+  // Menu items handlers
+  const toggleMenuItem = (itemId: string) => {
+    setSelectedMenuItems((prev) => {
+      const current = prev[itemId] || 0
+      if (current === 0) {
+        return { ...prev, [itemId]: 1 }
+      }
+      const newItems = { ...prev }
+      delete newItems[itemId]
+      return newItems
+    })
+  }
+
+  const updateMenuItemQuantity = (itemId: string, delta: number) => {
+    setSelectedMenuItems((prev) => {
+      const current = prev[itemId] || 0
+      const newQuantity = Math.max(0, current + delta)
+      if (newQuantity === 0) {
+        const newItems = { ...prev }
+        delete newItems[itemId]
+        return newItems
+      }
+      return { ...prev, [itemId]: newQuantity }
+    })
   }
 
   // Validation for step 1
@@ -227,6 +277,12 @@ export function BookingFormV2({
       return false
     }
 
+    // Validate rules acceptance
+    if (!acceptedRules) {
+      toast.error('Vui lòng đọc và chấp nhận nội quy Chill Cine')
+      return false
+    }
+
     return true
   }
 
@@ -262,7 +318,10 @@ export function BookingFormV2({
         endTime: timeCalc.end,
         duration: timeCalc.totalHours,
         comboPackageId: selectedCombo,
-        menuItems: [], // No menu items in this simplified version
+        menuItems: Object.entries(selectedMenuItems).map(([menuItemId, quantity]) => ({
+          menuItemId,
+          quantity,
+        })),
         notes: `Combo: ${combo?.name}, Additional hours: ${additionalHours}h`,
       }
 
@@ -347,7 +406,7 @@ export function BookingFormV2({
             </Alert>
 
             {/* Room Selection */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Hạng phòng</Label>
                 <Input value={room.roomTypeId.name} disabled className="mt-1" />
@@ -358,7 +417,7 @@ export function BookingFormV2({
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Chọn phòng" />
                   </SelectTrigger>
-                  <SelectContent position="popper" sideOffset={4} align="start">
+                  <SelectContent position="popper" sideOffset={4} align="start" className="max-w-[calc(100vw-2rem)]">
                     {availableRooms.map((r) => (
                       <SelectItem key={r._id} value={r._id}>
                         {r.code} - {r.name}
@@ -494,6 +553,69 @@ export function BookingFormV2({
               </div>
             </div>
 
+            {/* Menu Items Selection */}
+            <div className="space-y-3 pt-4 border-t-2 border-pink-200">
+              <Label className="text-base font-semibold text-gray-800">Menu dịch vụ (tùy chọn)</Label>
+              {isLoadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-pink-500" />
+                  <span className="ml-2 text-sm text-gray-600">Đang tải menu...</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {menuItems.map((item) => (
+                    <div
+                      key={item._id}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg border-2 transition-all",
+                        selectedMenuItems[item._id]
+                          ? "border-pink-400 bg-pink-50"
+                          : "border-pink-100 hover:border-pink-300 hover:bg-pink-50/50",
+                      )}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-gray-800">{item.name}</div>
+                        <div className="text-xs text-pink-600 font-semibold">{item.price.toLocaleString("vi-VN")}đ</div>
+                      </div>
+                      {selectedMenuItems[item._id] ? (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0 border-pink-300 bg-transparent"
+                            onClick={() => updateMenuItemQuantity(item._id, -1)}
+                          >
+                            -
+                          </Button>
+                          <span className="w-6 text-center font-semibold text-pink-600">{selectedMenuItems[item._id]}</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0 border-pink-300 bg-transparent"
+                            onClick={() => updateMenuItemQuantity(item._id, 1)}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-pink-300 hover:bg-pink-100 bg-transparent"
+                          onClick={() => toggleMenuItem(item._id)}
+                        >
+                          Thêm
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Summary */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div className="text-sm">
@@ -611,26 +733,185 @@ export function BookingFormV2({
               </div>
 
               {/* Booking Summary */}
-              <div className="border rounded-lg p-4 bg-gray-50 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Phòng:</span>
-                  <span className="font-medium">{room.code} - {room.name}</span>
+              <div className="border-2 border-pink-200 rounded-lg p-4 bg-gradient-to-br from-pink-50 to-purple-50 space-y-3">
+                <h4 className="font-semibold text-base text-gray-800 mb-3 border-b border-pink-200 pb-2">
+                  Thông tin đặt phòng
+                </h4>
+                
+                {/* Room Info */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600 text-sm">Phòng:</span>
+                    <span className="font-semibold text-gray-800 text-right">{room.code} - {room.name}</span>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600 text-sm">Hạng phòng:</span>
+                    <span className="font-semibold text-gray-800">{room.roomTypeId.name}</span>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600 text-sm">Số người:</span>
+                    <span className="font-semibold text-gray-800">{room.capacity} người</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Thời gian:</span>
-                  <span className="font-medium">
-                    {timeCalc && format(timeCalc.start, 'HH:mm dd/MM/yyyy', { locale: vi })}
-                  </span>
+
+                {/* Time Info */}
+                <div className="space-y-2 pt-2 border-t border-pink-200">
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600 text-sm">Nhận phòng:</span>
+                    <span className="font-semibold text-gray-800 text-right">
+                      {timeCalc && format(timeCalc.start, 'HH:mm - dd/MM/yyyy', { locale: vi })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600 text-sm">Trả phòng:</span>
+                    <span className="font-semibold text-gray-800 text-right">
+                      {timeCalc && format(timeCalc.end, 'HH:mm - dd/MM/yyyy', { locale: vi })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600 text-sm">Thời lượng:</span>
+                    <span className="font-semibold text-pink-600">{timeCalc?.totalHours || 0} giờ</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Thời lượng:</span>
-                  <span className="font-medium">{timeCalc?.totalHours || 0} giờ</span>
-                </div>
-                <div className="border-t pt-2 flex justify-between">
-                  <span className="font-semibold">Tổng tiền:</span>
-                  <span className="font-bold text-pink-600 text-lg">
+
+                {/* Combo Info */}
+                {selectedCombo && (
+                  <div className="space-y-2 pt-2 border-t border-pink-200">
+                    <div className="flex justify-between items-start">
+                      <span className="text-gray-600 text-sm">Combo:</span>
+                      <span className="font-semibold text-gray-800 text-right">
+                        {combos.find(c => c._id === selectedCombo)?.name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-start">
+                      <span className="text-gray-600 text-sm">Giá combo:</span>
+                      <span className="font-semibold text-gray-800">
+                        {combos.find(c => c._id === selectedCombo)?.price.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Hours */}
+                {additionalHours > 0 && (
+                  <div className="flex justify-between items-start">
+                    <span className="text-gray-600 text-sm">Giờ bổ sung:</span>
+                    <span className="font-semibold text-gray-800">
+                      {additionalHours}h × {room.pricePerHour.toLocaleString('vi-VN')}đ = {(additionalHours * room.pricePerHour).toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                )}
+
+                {/* Menu Items */}
+                {Object.keys(selectedMenuItems).length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-pink-200">
+                    <div className="text-gray-600 text-sm font-medium mb-2">Dịch vụ bổ sung:</div>
+                    {Object.entries(selectedMenuItems).map(([itemId, quantity]) => {
+                      const item = menuItems.find(m => m._id === itemId)
+                      if (!item) return null
+                      return (
+                        <div key={itemId} className="flex justify-between items-start pl-3">
+                          <span className="text-gray-600 text-sm">
+                            • {item.name} × {quantity}
+                          </span>
+                          <span className="font-medium text-gray-800">
+                            {(item.price * quantity).toLocaleString('vi-VN')}đ
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Total */}
+                <div className="border-t-2 border-pink-300 pt-3 mt-3 flex justify-between items-center">
+                  <span className="font-bold text-gray-800 text-base">Tổng tiền thanh toán:</span>
+                  <span className="font-bold text-pink-600 text-xl">
                     {totalPrice.toLocaleString('vi-VN')}đ
                   </span>
+                </div>
+              </div>
+
+              {/* Rules Acceptance */}
+              <div className="flex items-start gap-3 p-4 border-2 border-pink-200 rounded-lg bg-pink-50">
+                <Checkbox
+                  id="rules"
+                  checked={acceptedRules}
+                  onCheckedChange={(checked) => setAcceptedRules(checked === true)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor="rules"
+                    className="text-xs leading-relaxed peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer text-gray-700"
+                  >
+                    Chấp nhận{" "}
+                    <Dialog open={showRulesDialog} onOpenChange={setShowRulesDialog}>
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-pink-600 font-semibold underline hover:text-pink-700"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          điều khoản
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-bold text-gray-800">
+                            📋 Nội quy Homestay nhà Chốn
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 text-sm text-gray-700 py-4">
+                          <div className="space-y-4">
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">1.</span>
+                              <span>Xin quý khách xuất trình ảnh CCCD, giấy tờ hợp lệ khi trú tại Chốn.</span>
+                            </p>
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">2.</span>
+                              <span>Không mang theo vũ khí, chất độc, chất dễ cháy nổ, buôn bán tàng trữ hàng cấm.</span>
+                            </p>
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">3.</span>
+                              <span>Không mời giới và mua bán mại dâm dưới mọi hình thức tại Chốn.</span>
+                            </p>
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">4.</span>
+                              <span>Quý khách không được tự ý thay đổi phòng, đem thêm người vào ở khi chưa được bên Chốn cho phép. Không được nấu ăn tại phòng.</span>
+                            </p>
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">5.</span>
+                              <span>Những đồ chơi vật dụng trang trí ở phòng khách làm hư hỏng thì phải bồi thường cho khách sau.</span>
+                            </p>
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">6.</span>
+                              <span>Rút thẻ điện khi khách ra khỏi bên Chốn để phòng chập điện.</span>
+                            </p>
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">7.</span>
+                              <span>Không đem vật nuôi vào phòng Chốn. Không hút thuốc phòng Chốn.</span>
+                            </p>
+                            <p className="flex gap-3">
+                              <span className="font-bold flex-shrink-0">8.</span>
+                              <span>Sau 23h khách vui lòng giảm âm lượng máy chiếu để giữ trật tự chung ở Chốn.</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex justify-center pt-4 border-t">
+                          <Button
+                            type="button"
+                            className="bg-green-600 hover:bg-green-700 text-white px-8"
+                            onClick={() => setShowRulesDialog(false)}
+                          >
+                            Đã hiểu
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    {" "}đặt phòng & chính sách bảo mật thông tin của Chốn Cinehome{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
                 </div>
               </div>
 

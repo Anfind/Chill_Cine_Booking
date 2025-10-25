@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { City, Branch } from '@/lib/models'
 import { cache, CacheTags } from '@/lib/cache'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse, notFoundResponse } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +50,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
  * Cập nhật thông tin city
  */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { id } = await params
@@ -69,13 +75,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // Check if city exists
     const existingCity = await City.findById(id)
     if (!existingCity) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Không tìm thấy tỉnh thành',
-        },
-        { status: 404 }
-      )
+      return notFoundResponse('Không tìm thấy tỉnh thành')
     }
 
     // Check duplicate code (nếu code thay đổi)
@@ -107,33 +107,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // Invalidate cache
     cache.clearByTag(CacheTags.CITIES)
 
-    return NextResponse.json({
-      success: true,
-      data: existingCity,
-      message: 'Cập nhật tỉnh thành thành công',
-    })
+    return successResponse(existingCity, 'Cập nhật tỉnh thành thành công')
   } catch (error) {
-    console.error('Error updating city:', error)
-    
-    // Handle duplicate slug error
-    if (error instanceof Error && error.message.includes('duplicate key')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Slug hoặc Code đã tồn tại',
-        },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Lỗi khi cập nhật tỉnh thành',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
 
@@ -142,6 +118,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
  * Xóa city (chỉ xóa nếu không còn branch nào)
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { id } = await params
@@ -149,13 +129,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     // Check if city exists
     const city = await City.findById(id)
     if (!city) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Không tìm thấy tỉnh thành',
-        },
-        { status: 404 }
-      )
+      return notFoundResponse('Không tìm thấy tỉnh thành')
     }
 
     // Check if city has any branches
@@ -176,19 +150,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     // Invalidate cache
     cache.clearByTag(CacheTags.CITIES)
 
-    return NextResponse.json({
-      success: true,
-      message: 'Xóa tỉnh thành thành công',
-    })
+    return successResponse(null, 'Xóa tỉnh thành thành công')
   } catch (error) {
-    console.error('Error deleting city:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Lỗi khi xóa tỉnh thành',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }

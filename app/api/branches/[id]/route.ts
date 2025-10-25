@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { Branch, City } from '@/lib/models'
 import { cache, CacheTags, withCache, CacheTTL } from '@/lib/cache'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse, notFoundResponse } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,6 +77,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
  * Cập nhật thông tin branch
  */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { id } = await params
@@ -97,30 +103,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     ).populate('cityId', 'name code')
 
     if (!branch) {
-      return NextResponse.json(
-        { success: false, error: 'Branch not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Branch not found')
     }
 
     // Invalidate cache
     cache.clearByTag(CacheTags.BRANCHES)
 
-    return NextResponse.json({
-      success: true,
-      data: branch,
-      message: 'Branch updated successfully',
-    })
+    return successResponse(branch, 'Branch updated successfully')
   } catch (error) {
-    console.error('Error updating branch:', error)
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to update branch',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
 
@@ -129,6 +120,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
  * Xóa branch (soft delete)
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { id } = await params
@@ -141,28 +136,14 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     )
 
     if (!branch) {
-      return NextResponse.json(
-        { success: false, error: 'Branch not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Branch not found')
     }
 
     // Invalidate cache
     cache.clearByTag(CacheTags.BRANCHES)
 
-    return NextResponse.json({
-      success: true,
-      message: 'Branch deleted successfully',
-    })
+    return successResponse(null, 'Branch deleted successfully')
   } catch (error) {
-    console.error('Error deleting branch:', error)
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to delete branch',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }

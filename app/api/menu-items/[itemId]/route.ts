@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { MenuItem } from '@/lib/models'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse, notFoundResponse } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +52,10 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ itemId: string }> }
 ) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { itemId } = await params
@@ -78,10 +84,7 @@ export async function PUT(
     // Check if menu item exists
     const existingItem = await MenuItem.findById(itemId)
     if (!existingItem) {
-      return NextResponse.json(
-        { success: false, error: 'Menu item not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Menu item not found')
     }
 
     // Update menu item
@@ -99,21 +102,9 @@ export async function PUT(
       { new: true }
     ).lean()
 
-    return NextResponse.json({
-      success: true,
-      data: updatedItem,
-      message: 'Menu item updated successfully',
-    })
+    return successResponse(updatedItem, 'Menu item updated successfully')
   } catch (error) {
-    console.error('Error updating menu item:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to update menu item',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
 
@@ -125,6 +116,10 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ itemId: string }> }
 ) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const { itemId } = await params
@@ -132,10 +127,7 @@ export async function DELETE(
     // Check if menu item exists
     const existingItem = await MenuItem.findById(itemId)
     if (!existingItem) {
-      return NextResponse.json(
-        { success: false, error: 'Menu item not found' },
-        { status: 404 }
-      )
+      return notFoundResponse('Menu item not found')
     }
 
     // Set isAvailable to false (soft delete)
@@ -143,19 +135,9 @@ export async function DELETE(
       isAvailable: false,
     })
 
-    return NextResponse.json({
-      success: true,
-      message: 'Menu item deleted successfully',
-    })
+    return successResponse(null, 'Menu item deleted successfully')
   } catch (error) {
-    console.error('Error deleting menu item:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to delete menu item',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }
+

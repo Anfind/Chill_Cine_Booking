@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import { ComboPackage } from '@/lib/models'
+import { requireAdmin } from '@/lib/auth/admin'
+import { errorResponse, successResponse } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +40,10 @@ export async function GET() {
  * Tạo combo package mới
  */
 export async function POST(request: Request) {
+  // ✅ SECURITY: Require admin authentication
+  const authError = await requireAdmin()
+  if (authError) return authError
+
   try {
     await connectDB()
     const body = await request.json()
@@ -75,23 +81,8 @@ export async function POST(request: Request) {
       isActive: body.isActive !== undefined ? body.isActive : true,
     })
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: combo,
-        message: 'Combo created successfully',
-      },
-      { status: 201 }
-    )
+    return successResponse(combo, 'Combo created successfully', 201)
   } catch (error) {
-    console.error('Error creating combo:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create combo',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return errorResponse(error)
   }
 }

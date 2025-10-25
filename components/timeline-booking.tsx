@@ -195,8 +195,8 @@ export function TimelineBooking({
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Legend for booking colors */}
-            <div className="hidden md:flex items-center gap-3 text-xs">
+            {/* Legend for booking colors - Desktop */}
+            <div className="hidden lg:flex items-center gap-3 text-xs">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded bg-gradient-to-r from-amber-400 to-yellow-500" />
                 <span className="text-muted-foreground">Chờ thanh toán</span>
@@ -210,6 +210,18 @@ export function TimelineBooking({
             <Button variant="ghost" size="sm" onClick={goToToday} className="h-7 sm:h-8 text-xs px-2 sm:px-3">
               Hôm nay
             </Button>
+          </div>
+        </div>
+        
+        {/* Legend for mobile/tablet - Below date controls */}
+        <div className="lg:hidden flex items-center justify-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 border-t border-border/40 bg-muted/30">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-gradient-to-r from-amber-400 to-yellow-500 shadow-sm" />
+            <span className="text-muted-foreground text-[10px] sm:text-xs font-medium">Chờ thanh toán</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-gradient-to-r from-rose-400 to-rose-500 shadow-sm" />
+            <span className="text-muted-foreground text-[10px] sm:text-xs font-medium">Đã thanh toán</span>
           </div>
         </div>
       </div>
