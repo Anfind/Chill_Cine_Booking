@@ -205,7 +205,7 @@ export function RoomsClient({ branchId }: { branchId: string }) {
                   className="w-full h-10 sm:h-11 text-sm sm:text-base font-semibold bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white shadow-lg"
                   onClick={() => router.push(`/booking/${room._id}`)}
                 >
-                  Đặt phòng ngay 🎬
+                  Đặt phòng ngay
                 </Button>
               </CardFooter>
             </Card>
