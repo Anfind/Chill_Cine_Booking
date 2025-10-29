@@ -17,6 +17,8 @@ import { vi } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { fetchComboPackages, fetchRooms, fetchMenuItems, createBooking } from "@/lib/api-client"
 import { toast } from "sonner"
+import { CCCDScanner } from "@/components/cccd-scanner"
+import type { CCCDData } from "@/lib/cccd-scanner"
 
 interface Room {
   _id: string
@@ -88,6 +90,8 @@ export function BookingFormV2({
   const [customerPhone, setCustomerPhone] = useState("")
   const [customerEmail, setCustomerEmail] = useState("")
   const [customerCCCD, setCustomerCCCD] = useState("")
+  const [cccdData, setCccdData] = useState<CCCDData | null>(null)
+  const [isCCCDVerified, setIsCCCDVerified] = useState(false)
   const [acceptedRules, setAcceptedRules] = useState(false)
   const [showRulesDialog, setShowRulesDialog] = useState(false)
 
@@ -265,15 +269,9 @@ export function BookingFormV2({
       return false
     }
 
-    // Validate CCCD
-    if (!customerCCCD.trim()) {
-      toast.error('Vui lòng nhập số CCCD/CMND')
-      return false
-    }
-
-    const cccdRegex = /^\d{9}$|^\d{12}$/
-    if (!cccdRegex.test(customerCCCD.trim())) {
-      toast.error('CCCD phải là 12 chữ số hoặc CMND cũ 9 chữ số')
+    // Validate CCCD verification
+    if (!isCCCDVerified || !cccdData) {
+      toast.error('Vui lòng quét và xác thực CCCD')
       return false
     }
 
@@ -687,38 +685,21 @@ export function BookingFormV2({
                 />
               </div>
 
-              <div>
-                <Label htmlFor="cccd">
-                  CCCD/CMND <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="cccd"
-                  type="text"
-                  value={customerCCCD}
-                  onChange={(e) => {
-                    // Chỉ cho phép nhập số
-                    const value = e.target.value.replace(/\D/g, '')
-                    if (value.length <= 12) {
-                      setCustomerCCCD(value)
-                    }
-                  }}
-                  placeholder="Nhập số CCCD (12 số) hoặc CMND (9 số)"
-                  className={cn(
-                    "mt-1",
-                    customerCCCD && !(/^\d{9}$|^\d{12}$/.test(customerCCCD)) && "border-red-500"
-                  )}
-                  maxLength={12}
-                  required
-                />
-                {customerCCCD && !(/^\d{9}$|^\d{12}$/.test(customerCCCD)) && (
-                  <p className="text-xs text-red-500 mt-1">
-                    CCCD phải là 12 chữ số hoặc CMND cũ 9 chữ số
-                  </p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  * Bắt buộc theo quy định pháp luật về lưu trú
-                </p>
-              </div>
+              {/* CCCD Scanner Component */}
+              <CCCDScanner
+                customerName={customerName}
+                minAge={18}
+                onScanSuccess={(data) => {
+                  setCccdData(data)
+                  setCustomerCCCD(data.idNumber)
+                  setIsCCCDVerified(true)
+                  toast.success('Xác thực CCCD thành công!')
+                }}
+                onScanError={(error) => {
+                  setIsCCCDVerified(false)
+                  toast.error(error)
+                }}
+              />
 
               <div>
                 <Label htmlFor="email">Email (tùy chọn)</Label>
